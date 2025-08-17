@@ -1,0 +1,20 @@
+package com.anshul.smartmediaai.ui.compose.expensetracker.state
+
+data class ExpenseItem( // Define your refined expense data structure
+    val merchant: String,
+    val amount: Double,
+    val date: String,
+    val category: String
+)
+
+data class ExpenseTrackerState(
+    val isLoading: Boolean = false,
+    val expenses: List<ExpenseItem> = emptyList(),
+    val errorMessage: String? = null,
+    val permissionGranted: Boolean = false
+)
+
+sealed class ExpenseTrackerSideEffect {
+    data class ShowToast(val message: String) : ExpenseTrackerSideEffect()
+    object RequestSmsPermission : ExpenseTrackerSideEffect()
+}

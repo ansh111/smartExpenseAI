@@ -1,0 +1,76 @@
+[versions]
+activityComposeVersion = "1.10.1"
+agp = "8.9.1"
+core = "12.1.2"
+firebaseAi = "17.1.0"
+firebaseBom = "34.1.0"
+gson = "2.11.0"
+kotlin = "2.1.0"
+coreKtx = "1.17.0"
+junit = "4.13.2"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx = "2.9.2"
+activityCompose = "1.10.1"
+composeBom = "2025.08.00"
+googleServices = "4.4.3"
+material3 = "1.3.2"
+material3Version = "1.2.1"
+materialIconsCore = "1.7.8"
+media3Common = "1.8.0"
+media3Exoplayer = "1.8.0"
+media3Transformer = "1.8.0"
+media3Ui = "1.8.0"
+hilt = "2.55"
+hiltNavigationCompose = "1.2.0"
+navigationCompose = "2.9.3"
+orbitCompose = "10.0.0"
+orbitCore = "10.0.0"
+orbitTest = "10.0.0"
+orbitViewmodel = "10.0.0"
+
+[libraries]
+androidx-activity-compose-v182 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsCore" }
+androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsCore" }
+androidx-material3-v121 = { module = "androidx.compose.material3:material3", version.ref = "material3Version" }
+androidx-media3-common = { module = "androidx.media3:media3-common", version.ref = "media3Common" }
+androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
+androidx-media3-transformer = { module = "androidx.media3:media3-transformer", version.ref = "media3Transformer" }
+androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+core = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "core" }
+firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "firebaseAi" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-vertexai = { module = "com.google.firebase:firebase-vertexai" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+orbit-compose = { module = "org.orbit-mvi:orbit-compose", version.ref = "orbitCompose" }
+orbit-core = { module = "org.orbit-mvi:orbit-core", version.ref = "orbitCore" }
+orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitTest" }
+orbit-viewmodel = { module = "org.orbit-mvi:orbit-viewmodel", version.ref = "orbitViewmodel" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+google-service = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
