@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect.ShowToast
 import org.orbitmvi.orbit.compose.collectSideEffect
 
@@ -54,7 +55,9 @@ fun ExpenseTrackerScreen(
                 Toast.makeText(context, sideEffect.message, Toast.LENGTH_SHORT).show()
             }
 
-            else -> {}
+            is ExpenseTrackerSideEffect.RequestSmsPermission -> {
+                
+            }
         }
 
     }

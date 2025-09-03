@@ -118,6 +118,11 @@ dependencies {
     implementation (libs.core)
 
     implementation (libs.gson)
+    //room db
+    implementation(libs.androidx.room.runtime)
+    annotationProcessor(libs.androidx.room.compiler)
+    kapt(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

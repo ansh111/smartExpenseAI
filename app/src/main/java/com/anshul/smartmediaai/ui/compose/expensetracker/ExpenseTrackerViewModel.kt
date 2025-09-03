@@ -7,9 +7,12 @@ import android.content.pm.PackageManager
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import com.anshul.smartmediaai.data.entities.ExpenseEntity
+import com.anshul.smartmediaai.data.repository.ExpenseRepo
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseItem
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerState
+import com.google.common.reflect.TypeToken
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
@@ -29,7 +32,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ExpenseTrackerViewModel @Inject constructor(
     @ApplicationContext private val context: Context ,
-    private val gson: Gson
+    private val gson: Gson,
+    private val repo: ExpenseRepo
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -60,8 +64,8 @@ class ExpenseTrackerViewModel @Inject constructor(
 
     fun scanSmsForExpenses() = intent {
         if (!state.permissionGranted) {
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast("SMS Permission not granted."))
             checkSmsPermission() // Re-trigger permission check if not granted
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("SMS Permission not granted."))
             return@intent
         }
 
@@ -77,17 +81,18 @@ class ExpenseTrackerViewModel @Inject constructor(
 
             val refinedExpenses = mutableListOf<ExpenseItem>()
             val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI()).generativeModel("gemini-2.0-flash") // Or your preferred model
+            val batchSize = 10
+            for ((index,batch) in smsMessages.chunked(batchSize).withIndex()) {
 
-            for (sms in smsMessages) {
-                // TODO: Craft a good prompt
                 val prompt = """
-                    Extract expense details from this SMS.
-                    Identify the merchant, amount, date, and categorize the expense (e.g., Food, Shopping, Bills, Travel, Other).
+                    Extract expense details from each of these SMS messages.
+                    For each SMS, identify the merchant, amount, date, and categorize the expense (e.g., Food, Shopping, Bills, Travel, Other).
                     If you cannot determine a value, use "N/A".
-                    Format the output as a JSON object with keys: "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
-
-                    SMS:
-                    $sms
+                    Return the output as a JSON array of objects. Each object should have keys:
+                    "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
+            
+                    SMS messages:
+                    ${batch.joinToString("\n\n")}
                 """.trimIndent()
 
                 val requestContent = content { text(prompt) }
@@ -99,10 +104,15 @@ class ExpenseTrackerViewModel @Inject constructor(
                     // For simplicity, this is a placeholder
                     try {
                         // Example (very basic, needs proper JSON parsing and error handling):
-                        val jsonResponse = jsonResponse.replace(Regex("```json|```"), "").trim()
-                         val parsedExpense = gson.fromJson(jsonResponse, ExpenseItem::class.java)
-                         refinedExpenses.add(parsedExpense)
-                        println("AI Response for SMS '$sms': $jsonResponse") // Log for debugging
+                        val finalJson = jsonResponse.replace(Regex("```json|```"), "").trim()
+                        // Parse the batch as a list of ExpenseItem
+                        val parsedExpenses: List<ExpenseItem> = gson.fromJson(
+                            finalJson,
+                            object : TypeToken<List<ExpenseItem>>() {}.type
+                        )
+                         refinedExpenses.addAll(parsedExpenses)
+                        println("Batch ${index + 1} processed: $finalJson")
+                       // println("AI Response for SMS '$sms': $jsonResponse") // Log for debugging
                     } catch (e: Exception) {
                         println("Error parsing AI response: ${e.message}")
                     }
@@ -115,6 +125,17 @@ class ExpenseTrackerViewModel @Inject constructor(
                     expenses = refinedExpenses // Add the parsed expenses here
                 )
             }
+            val expenseEntities = refinedExpenses.map { item ->
+                ExpenseEntity(
+                    description = item.merchant,
+                    amount = item.amount,
+                    date = item.date,
+                    category = item.category
+                )
+
+            }
+            repo.insertAllExpenses(expenseEntities)
+
             if (refinedExpenses.isNotEmpty()) {
                 val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
                 reduce {
@@ -141,13 +162,16 @@ class ExpenseTrackerViewModel @Inject constructor(
 
     private suspend fun readSmsMessages(): List<String> = withContext(Dispatchers.IO) {
         val messages = mutableListOf<String>()
+        val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000) // 30 days in ms
+
         val cursor = contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             arrayOf(Telephony.Sms.BODY, Telephony.Sms.ADDRESS, Telephony.Sms.DATE),
-            "${Telephony.Sms.ADDRESS} LIKE ? OR ${Telephony.Sms.ADDRESS} LIKE ?", // Example: Filter by bank sender IDs
-            arrayOf("%-MYBANK", "%-URBANK"), // Replace with actual sender IDs
-            "${Telephony.Sms.DATE} DESC LIMIT 50" // Get recent 50 messages, adjust as needed
+            "(${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ?) AND ${Telephony.Sms.DATE} >= ?",
+            arrayOf("%debit%", "%debited%","%sent%", thirtyDaysAgo.toString()),
+            "${Telephony.Sms.DATE} DESC" // Sort latest first
         )
+
 
         cursor?.use {
             val bodyIndex = it.getColumnIndex(Telephony.Sms.BODY)
@@ -161,14 +185,15 @@ class ExpenseTrackerViewModel @Inject constructor(
                         body.contains("debited", ignoreCase = true) ||
                         body.contains("transaction", ignoreCase = true) ||
                         body.contains("INR", ignoreCase = true) || // Common currency symbol
-                        body.contains("Rs.", ignoreCase = true)
+                        body.contains("Rs.", ignoreCase = true) ||
+                        body.contains("sent",ignoreCase = true)
                     ) {
                         messages.add(body)
                     }
                 }
             }
         }
-        return@withContext messages.take(10) // Process a smaller batch first for testing
+        return@withContext messages.take(100) // Process a smaller batch first for testing
     }
 
     private suspend fun analyzeExpensesAndRecommend(expenses: List<ExpenseItem>): String? {
@@ -186,11 +211,11 @@ class ExpenseTrackerViewModel @Inject constructor(
 
                 Tasks:
                 1. Identify spending patterns (high shopping, food, travel, bills, etc).
-                2. For shopping-related expenses: recommend cheaper alternatives, online platforms, or stores.
+                2. For shopping-related expenses: recommend cheaper alternatives, online platforms, or stores compare the cost also
                 3. For miscellaneous expenses: suggest suitable equity mutual funds for disciplined investing.
                 4. Provide actionable recommendations in a friendly, concise format.
                 5. Recommendation should be divided into various actionables 
-                6. If possible define the exact mutual fund to invest along with an past performance i.e CAGR
+                6. If possible define the exact mutual fund to invest along with an past performance i.e CAGR also add the other expense values and compare its value growth wrt recommended fund 
                 Overall restrict it to 50 words only
             """.trimIndent()
 

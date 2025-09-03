@@ -1,4 +1,4 @@
-package com.anshul.smartmediaai.di
+package com.anshul.smartmediaai.core.di
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
