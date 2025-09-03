@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "135013877350",
-    "project_id": "smart-media-ai",
-    "storage_bucket": "smart-media-ai.firebasestorage.app"
+    "project_number": "755076631623",
+    "project_id": "expenseanalyserai",
+    "storage_bucket": "expenseanalyserai.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:135013877350:android:01882fac1b53c7f77b4fa7",
+        "mobilesdk_app_id": "1:755076631623:android:c9abe08df02c8d1c2bf562",
         "android_client_info": {
           "package_name": "com.anshul.smartmediaai"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBc92odGTXjWBRngOrucSe9YNf5I4R-jng"
+          "current_key": "AIzaSyCzNocgsLQFF_0rHSZn6_QKlHMEu7-f314"
         }
       ],
       "services": {

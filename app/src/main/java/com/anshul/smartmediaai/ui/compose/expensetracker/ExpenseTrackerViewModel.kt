@@ -37,7 +37,7 @@ class ExpenseTrackerViewModel @Inject constructor(
 
     private val contentResolver: ContentResolver = context.contentResolver
 
-    fun checkSmsPermission() = intent {
+    private fun checkSmsPermission() = intent {
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.READ_SMS
@@ -76,8 +76,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
 
             val refinedExpenses = mutableListOf<ExpenseItem>()
-            // Initialize your Generative Model (similar to VideoSummarisationViewModel)
-            val generativeModel = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel("gemini-1.5-flash") // Or your preferred model
+            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI()).generativeModel("gemini-2.0-flash") // Or your preferred model
 
             for (sms in smsMessages) {
                 // TODO: Craft a good prompt
@@ -117,7 +116,13 @@ class ExpenseTrackerViewModel @Inject constructor(
                 )
             }
             if (refinedExpenses.isNotEmpty()) {
-                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Expenses extracted."))
+                val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
+                reduce {
+                    state.copy(
+                        recommendation = recommendations
+                    )
+                }
+                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Expenses extracted.Recommendations ready"))
             } else {
                 postSideEffect(ExpenseTrackerSideEffect.ShowToast("Could not extract details from SMS."))
             }
@@ -166,6 +171,38 @@ class ExpenseTrackerViewModel @Inject constructor(
         return@withContext messages.take(10) // Process a smaller batch first for testing
     }
 
-    // You would need a robust JSON parsing function here
-    // private fun parseExpenseFromJson(jsonString: String): ExpenseItem { ... }
+    private suspend fun analyzeExpensesAndRecommend(expenses: List<ExpenseItem>): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
+                    .generativeModel("gemini-2.0-flash") // Use PRO model for reasoning
+
+                val expensesJson = gson.toJson(expenses)
+
+                val prompt = """
+                You are an AI financial assistant.
+                The user’s recent expenses are as follows (JSON format):
+                $expensesJson
+
+                Tasks:
+                1. Identify spending patterns (high shopping, food, travel, bills, etc).
+                2. For shopping-related expenses: recommend cheaper alternatives, online platforms, or stores.
+                3. For miscellaneous expenses: suggest suitable equity mutual funds for disciplined investing.
+                4. Provide actionable recommendations in a friendly, concise format.
+                5. Recommendation should be divided into various actionables 
+                6. If possible define the exact mutual fund to invest along with an past performance i.e CAGR
+                Overall restrict it to 50 words only
+            """.trimIndent()
+
+                val requestContent = content { text(prompt) }
+                val response = generativeModel.generateContent(requestContent)
+
+                return@withContext response.text
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return@withContext null
+            }
+        }
+    }
+
 }
