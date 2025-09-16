@@ -4,14 +4,20 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.provider.Telephony
+import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import com.anshul.smartmediaai.data.entities.ExpenseEntity
 import com.anshul.smartmediaai.data.repository.ExpenseRepo
+import com.anshul.smartmediaai.data.repository.ReadSmsRepo
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseItem
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerState
+import com.anshul.smartmediaai.util.ExpenseDataFetcher
+import com.google.android.gms.location.LocationServices
 import com.google.common.reflect.TypeToken
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
@@ -22,18 +28,23 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.viewmodel.container
+import java.util.Locale
 import javax.inject.Inject
-
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 
 @HiltViewModel
 class ExpenseTrackerViewModel @Inject constructor(
     @ApplicationContext private val context: Context ,
     private val gson: Gson,
-    private val repo: ExpenseRepo
+    private val repo: ExpenseRepo,
+    private val readSmsRepo: ReadSmsRepo,
+    private val expenseDataFetcher: ExpenseDataFetcher,
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -72,7 +83,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         reduce { state.copy(isLoading = true, errorMessage = null, expenses = emptyList()) }
 
         try {
-            val smsMessages = readSmsMessages()
+            val smsMessages = readSmsRepo.readSms(0L)
             if (smsMessages.isEmpty()) {
                 reduce { state.copy(isLoading = false) }
                 postSideEffect(ExpenseTrackerSideEffect.ShowToast("No relevant SMS found."))
@@ -160,41 +171,12 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    private suspend fun readSmsMessages(): List<String> = withContext(Dispatchers.IO) {
-        val messages = mutableListOf<String>()
-        val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000) // 30 days in ms
-
-        val cursor = contentResolver.query(
-            Telephony.Sms.Inbox.CONTENT_URI,
-            arrayOf(Telephony.Sms.BODY, Telephony.Sms.ADDRESS, Telephony.Sms.DATE),
-            "(${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ?) AND ${Telephony.Sms.DATE} >= ?",
-            arrayOf("%debit%", "%debited%","%sent%", thirtyDaysAgo.toString()),
-            "${Telephony.Sms.DATE} DESC" // Sort latest first
-        )
-
-
-        cursor?.use {
-            val bodyIndex = it.getColumnIndex(Telephony.Sms.BODY)
-            //val addressIndex = it.getColumnIndex(Telephony.Sms.ADDRESS) // If you need sender
-
-            if (bodyIndex != -1) { // Ensure column exists
-                while (it.moveToNext()) {
-                    val body = it.getString(bodyIndex)
-                    // You might want more sophisticated filtering here based on keywords
-                    if (body.contains("spent", ignoreCase = true) ||
-                        body.contains("debited", ignoreCase = true) ||
-                        body.contains("transaction", ignoreCase = true) ||
-                        body.contains("INR", ignoreCase = true) || // Common currency symbol
-                        body.contains("Rs.", ignoreCase = true) ||
-                        body.contains("sent",ignoreCase = true)
-                    ) {
-                        messages.add(body)
-                    }
-                }
+    suspend fun fetchCurrentLocationSuspend(context: Context): JSONObject =
+        suspendCoroutine { cont ->
+            fetchCurrentLocation(context) { json ->
+                cont.resume(json)
             }
         }
-        return@withContext messages.take(100) // Process a smaller batch first for testing
-    }
 
     private suspend fun analyzeExpensesAndRecommend(expenses: List<ExpenseItem>): String? {
         return withContext(Dispatchers.IO) {
@@ -203,21 +185,32 @@ class ExpenseTrackerViewModel @Inject constructor(
                     .generativeModel("gemini-2.0-flash") // Use PRO model for reasoning
 
                 val expensesJson = gson.toJson(expenses)
+                val locationJson = fetchCurrentLocationSuspend(context)
+                val lat = locationJson.optDouble("latitude")
+                val lon = locationJson.optDouble("longitude")
+                val currentLocation = locationJson.optString("city")
+                val restaurantsJson = expenseDataFetcher.fetchNearbyRestaurants(lat,lon)
+                val servicesJson = expenseDataFetcher.fetchNearbyServices(lat, lon)
 
                 val prompt = """
                 You are an AI financial assistant.
-                The user’s recent expenses are as follows (JSON format):
-                $expensesJson
-
+                User’s recent expenses (JSON): $expensesJson
+                User’s location: $currentLocation
+                
+                Nearby restaurants: $restaurantsJson
+                Nearby services: $servicesJson
+            
+                
                 Tasks:
-                1. Identify spending patterns (high shopping, food, travel, bills, etc).
-                2. For shopping-related expenses: recommend cheaper alternatives, online platforms, or stores compare the cost also
-                3. For miscellaneous expenses: suggest suitable equity mutual funds for disciplined investing.
-                4. Provide actionable recommendations in a friendly, concise format.
-                5. Recommendation should be divided into various actionables 
-                6. If possible define the exact mutual fund to invest along with an past performance i.e CAGR also add the other expense values and compare its value growth wrt recommended fund 
-                Overall restrict it to 50 words only
-            """.trimIndent()
+                1. Identify spending patterns.
+                2. Recommend cheaper local/online alternatives from API data.
+                3. Suggest exact mutual funds with past CAGR.
+                4. Compare potential fund growth vs current expense values.
+                5. Give concise, actionable recommendations in ≤50 words.
+                """.trimIndent()
+
+                Log.i("prompt",prompt)
+
 
                 val requestContent = content { text(prompt) }
                 val response = generativeModel.generateContent(requestContent)
@@ -229,5 +222,39 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
         }
     }
+
+
+    fun fetchCurrentLocation(context: Context, onResult: (JSONObject) -> Unit) {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                try {
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+
+                    val address = addresses?.firstOrNull()
+                    val locationJson = JSONObject().apply {
+                        put("latitude", location.latitude)
+                        put("longitude", location.longitude)
+                        put("city", address?.locality ?: "Unknown City")
+                        put("state", address?.adminArea ?: "Unknown State")
+                        put("country", address?.countryName ?: "Unknown Country")
+                        put("postalCode", address?.postalCode ?: "Unknown PostalCode")
+                    }
+
+                    onResult(locationJson)
+                } catch (e: Exception) {
+                    onResult(JSONObject().put("error", "Error resolving location"))
+                }
+            } else {
+                onResult(JSONObject().put("error", "Location not available"))
+            }
+        }.addOnFailureListener {
+            onResult(JSONObject().put("error", "Error fetching location"))
+        }
+    }
+
+
 
 }

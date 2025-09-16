@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
                     containerColor = MaterialTheme.colorScheme.background
                 ){ innerPadding ->
                     ExpenseTrackerScreen(modifier = Modifier.padding(innerPadding))
+                   // VideoSummarisationScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
         }

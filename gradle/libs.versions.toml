@@ -28,7 +28,9 @@ orbitCompose = "10.0.0"
 orbitCore = "10.0.0"
 orbitTest = "10.0.0"
 orbitViewmodel = "10.0.0"
+playServicesLocation = "21.3.0"
 roomRuntime = "2.7.2"
+workRuntimeKtx = "2.10.3"
 
 [libraries]
 androidx-activity-compose-v182 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
@@ -44,6 +46,7 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRuntime" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 core = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "core" }
 firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "firebaseAi" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
@@ -71,6 +74,7 @@ orbit-compose = { module = "org.orbit-mvi:orbit-compose", version.ref = "orbitCo
 orbit-core = { module = "org.orbit-mvi:orbit-core", version.ref = "orbitCore" }
 orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitTest" }
 orbit-viewmodel = { module = "org.orbit-mvi:orbit-viewmodel", version.ref = "orbitViewmodel" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
