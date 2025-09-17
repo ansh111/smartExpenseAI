@@ -3,6 +3,7 @@ package com.anshul.smartmediaai.ui.compose.expensetracker
 import android.Manifest
 import android.content.ContentResolver
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.provider.Telephony
@@ -36,6 +37,7 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import androidx.core.content.edit
 
 
 @HiltViewModel
@@ -45,22 +47,17 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val repo: ExpenseRepo,
     private val readSmsRepo: ReadSmsRepo,
     private val expenseDataFetcher: ExpenseDataFetcher,
+    private  val preferences: SharedPreferences
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
         container(ExpenseTrackerState())
 
-    private val contentResolver: ContentResolver = context.contentResolver
+    companion object {
+        const val LAST_SYNC_TIME = "last_sync_time"
+    }
 
     private fun checkSmsPermission() = intent {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-        reduce { state.copy(permissionGranted = hasPermission) }
-        if (!hasPermission) {
-            postSideEffect(ExpenseTrackerSideEffect.RequestSmsPermission)
-        }
     }
 
     fun onPermissionResult(granted: Boolean) = intent {
@@ -74,15 +71,20 @@ class ExpenseTrackerViewModel @Inject constructor(
     }
 
     fun scanSmsForExpenses() = intent {
-        if (!state.permissionGranted) {
-            checkSmsPermission() // Re-trigger permission check if not granted
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast("SMS Permission not granted."))
+
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            postSideEffect(ExpenseTrackerSideEffect.RequestSmsPermission)
             return@intent
         }
 
         reduce { state.copy(isLoading = true, errorMessage = null, expenses = emptyList()) }
 
         try {
+
             val smsMessages = readSmsRepo.readSms(0L)
             if (smsMessages.isEmpty()) {
                 reduce { state.copy(isLoading = false) }
@@ -91,7 +93,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
 
             val refinedExpenses = mutableListOf<ExpenseItem>()
-            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI()).generativeModel("gemini-2.0-flash") // Or your preferred model
+            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI()).generativeModel("gemini-2.5-pro") // Or your preferred model
             val batchSize = 10
             for ((index,batch) in smsMessages.chunked(batchSize).withIndex()) {
 
@@ -130,12 +132,6 @@ class ExpenseTrackerViewModel @Inject constructor(
                 }
             }
 
-            reduce {
-                state.copy(
-                    isLoading = false,
-                    expenses = refinedExpenses // Add the parsed expenses here
-                )
-            }
             val expenseEntities = refinedExpenses.map { item ->
                 ExpenseEntity(
                     description = item.merchant,
@@ -146,6 +142,16 @@ class ExpenseTrackerViewModel @Inject constructor(
 
             }
             repo.insertAllExpenses(expenseEntities)
+            preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+
+
+            reduce {
+                state.copy(
+                    isLoading = false,
+                    expenses = refinedExpenses // Add the parsed expenses here
+                )
+            }
+
 
             if (refinedExpenses.isNotEmpty()) {
                 val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
@@ -182,7 +188,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                    .generativeModel("gemini-2.0-flash") // Use PRO model for reasoning
+                    .generativeModel("gemini-2.5-pro") // Use PRO model for reasoning
 
                 val expensesJson = gson.toJson(expenses)
                 val locationJson = fetchCurrentLocationSuspend(context)
