@@ -12,7 +12,8 @@ data class ExpenseTrackerState(
     val expenses: List<ExpenseItem> = emptyList(),
     val errorMessage: String? = null,
     val permissionGranted: Boolean = false,
-    val recommendation: String? = null
+    val recommendation: String? = null,
+    val chartHtml: String = ""
 )
 
 sealed class ExpenseTrackerSideEffect {

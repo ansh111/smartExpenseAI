@@ -110,6 +110,15 @@ fun ExpenseTrackerScreen(
                 }
             }
 
+            if(state.chartHtml.isNotBlank()){
+                item {
+                    Text("Expense Categories Chart:", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ExpenseChart(modifier, viewModel)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
             if (state.expenses.isNotEmpty()) {
                 item {
                     Text("Detected Expenses:", style = MaterialTheme.typography.titleMedium)
