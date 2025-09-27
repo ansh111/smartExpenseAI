@@ -13,7 +13,7 @@ data class ExpenseTrackerState(
     val errorMessage: String? = null,
     val permissionGranted: Boolean = false,
     val recommendation: String? = null,
-    val chartHtml: String = ""
+    val nativeChart: Map<String, Double> = emptyMap()
 )
 
 sealed class ExpenseTrackerSideEffect {

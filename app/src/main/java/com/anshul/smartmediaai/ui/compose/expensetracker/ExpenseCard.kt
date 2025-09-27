@@ -25,7 +25,7 @@ import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseItem
 @Composable
 fun ExpenseCard(expense: ExpenseItem, modifier: Modifier = Modifier) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().padding(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {

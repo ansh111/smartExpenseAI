@@ -163,11 +163,13 @@ class ExpenseTrackerViewModel @Inject constructor(
 
             val chartHtml = generateCategoryChartHtml(refinedExpenses)
 
+            val nativeChart = generateNativeChart(refinedExpenses)
+
                 reduce {
                     state.copy(
                         isLoading = false,
                         expenses = refinedExpenses,
-                        chartHtml = chartHtml
+                        nativeChart = nativeChart
                     )
                 }
 
@@ -252,6 +254,13 @@ class ExpenseTrackerViewModel @Inject constructor(
     private fun aggregateExpensesByCategory(expenses: List<ExpenseItem>): Map<String, Double> {
         return expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
+    }
+
+    private fun generateNativeChart(expenseItem: List<ExpenseItem>): Map<String, Double> {
+        if(expenseItem.isEmpty()) return emptyMap()
+        val aggregatedData = aggregateExpensesByCategory(expenseItem)
+        return aggregatedData
+
     }
 
     private fun generateCategoryChartHtml(expenseItems: List<ExpenseItem>): String {

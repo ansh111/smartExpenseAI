@@ -21,7 +21,7 @@ import androidx.compose.runtime.getValue
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ExpenseChart(modifier: Modifier, viewModel: ExpenseTrackerViewModel = hiltViewModel()){
+fun ExpenseChart(viewModel: ExpenseTrackerViewModel = hiltViewModel()){
     val state by viewModel.container.stateFlow.collectAsState()
     AndroidView(
         factory = { ctx ->
@@ -66,7 +66,8 @@ fun ExpenseChart(modifier: Modifier, viewModel: ExpenseTrackerViewModel = hiltVi
             // The 'null' baseUrl is important for Chart.js to work correctly from a local HTML string.
             // The "text/html" mimeType tells WebView to render it as HTML.
             // "UTF-8" is a standard encoding.
-            webView.loadDataWithBaseURL("file:///", state.chartHtml, "text/html" ,"utf-8",null)
+            //add fata in form of chart if using chart.js
+            webView.loadDataWithBaseURL("file:///", "", "text/html" ,"utf-8",null)
         },
         modifier = Modifier
             .fillMaxWidth()

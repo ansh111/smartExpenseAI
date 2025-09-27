@@ -29,27 +29,33 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavController
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect.ShowToast
+import com.anshul.smartmediaai.ui.nav.Screen
+import com.anshul.smartmediaai.ui.theme.PrimaryBlue
 import org.orbitmvi.orbit.compose.collectSideEffect
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseTrackerScreen(
+    navController: NavController,
     viewModel: ExpenseTrackerViewModel = hiltViewModel(),
-    modifier: Modifier
 ) {
     val state by viewModel.container.stateFlow.collectAsState()
     val context = LocalContext.current
@@ -81,7 +87,11 @@ fun ExpenseTrackerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Expense Tracker") })
+            TopAppBar(title = { Text("Expense Tracker") },
+                colors = topAppBarColors(
+                containerColor = PrimaryBlue,
+                titleContentColor = Color.White,
+            ))
         }
     ) { paddingValues ->
         LazyColumn(
@@ -110,22 +120,22 @@ fun ExpenseTrackerScreen(
                 }
             }
 
-            if(state.chartHtml.isNotBlank()){
+            if(state.nativeChart.isNotEmpty()){
                 item {
                     Text("Expense Categories Chart:", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
-                    ExpenseChart(modifier, viewModel)
+                    ExpenseNativeChart(viewModel)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
 
             if (state.expenses.isNotEmpty()) {
                 item {
-                    Text("Detected Expenses:", style = MaterialTheme.typography.titleMedium)
+                    Button( onClick = {navController.navigate(Screen.ExpenseDetails.route)}) {
+                        Text("View Expenses")
+                    }
                 }
-                items(state.expenses) { expense ->
-                    ExpenseCard(expense = expense)
-                }
+
             }
 
             if (state.recommendation?.isNotEmpty() == true) {
@@ -181,9 +191,13 @@ fun ExpenseTrackerScreen(
     }
 }
 
-@Preview(showBackground = true)
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview
 @Composable
 fun ExpenseTrackerScreenPreview() {
-    // You might want to provide a mock ViewModel for previews
-    ExpenseTrackerScreen(modifier = Modifier.fillMaxSize())
+    val context = LocalContext.current
+    ExpenseTrackerScreen(
+        navController = NavHostController(context)
+    )
 }
+

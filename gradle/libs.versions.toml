@@ -23,6 +23,7 @@ media3Transformer = "1.8.0"
 media3Ui = "1.8.0"
 hilt = "2.55"
 hiltNavigationCompose = "1.2.0"
+mpandroidchart = "v3.1.0"
 navigationCompose = "2.9.3"
 orbitCompose = "10.0.0"
 orbitCore = "10.0.0"
@@ -70,6 +71,7 @@ material3 = { module = "androidx.compose.material3:material3", version.ref = "ma
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+mpandroidchart = { module = "com.github.PhilJay:MPAndroidChart", version.ref = "mpandroidchart" }
 orbit-compose = { module = "org.orbit-mvi:orbit-compose", version.ref = "orbitCompose" }
 orbit-core = { module = "org.orbit-mvi:orbit-core", version.ref = "orbitCore" }
 orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitTest" }
