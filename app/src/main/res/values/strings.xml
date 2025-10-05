@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Smart Media AI</string>
+    <string name="app_name">Expense Analyser</string>
 
     <!--Video titles for list of sample videos-->
     <string name="video_title_big_buck_bunny">Big Buck Bunny</string>

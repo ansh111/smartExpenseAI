@@ -2,8 +2,11 @@
 activityComposeVersion = "1.10.1"
 agp = "8.9.1"
 core = "12.1.2"
+credentials = "1.6.0-beta01"
+credentialsPlayServicesAuth = "1.6.0-beta01"
 firebaseAi = "17.1.0"
 firebaseBom = "34.1.0"
+googleid = "1.1.1"
 gson = "2.11.0"
 kotlin = "2.1.0"
 coreKtx = "1.17.0"
@@ -32,10 +35,12 @@ orbitViewmodel = "10.0.0"
 playServicesLocation = "21.3.0"
 roomRuntime = "2.7.2"
 workRuntimeKtx = "2.10.3"
+playServicesAuthBase = "18.3.0"
 
 [libraries]
 androidx-activity-compose-v182 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
 androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsCore" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsCore" }
 androidx-material3-v121 = { module = "androidx.compose.material3:material3", version.ref = "material3Version" }
@@ -49,10 +54,12 @@ androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRunt
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 core = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "core" }
+credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "firebaseAi" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-vertexai = { module = "com.google.firebase:firebase-vertexai" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -77,6 +84,7 @@ orbit-core = { module = "org.orbit-mvi:orbit-core", version.ref = "orbitCore" }
 orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitTest" }
 orbit-viewmodel = { module = "org.orbit-mvi:orbit-viewmodel", version.ref = "orbitViewmodel" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+play-services-auth-base = { group = "com.google.android.gms", name = "play-services-auth-base", version.ref = "playServicesAuthBase" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

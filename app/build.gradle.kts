@@ -32,11 +32,13 @@ android {
         debug {
             buildConfigField("String", "GEMINI_API_KEY", "\"${project.findProperty("GEMINI_API_KEY") ?: ""}\"")
             buildConfigField("String", "GOOGLE_API_KEY", "\"${project.findProperty("GOOGLE_API_KEY") ?: ""}\"")
+            buildConfigField("String","WEB_CLIENT_ID","\"${project.findProperty("WEB_CLIENT_ID") ?: ""}\"")
         }
         release {
             isMinifyEnabled = false
             buildConfigField("String", "GEMINI_API_KEY", "\"${project.findProperty("GEMINI_API_KEY") ?: ""}\"")
             buildConfigField("String", "GOOGLE_API_KEY", "\"${project.findProperty("GOOGLE_API_KEY") ?: ""}\"")
+            buildConfigField("String","WEB_CLIENT_ID","\"${project.findProperty("WEB_CLIENT_ID") ?: ""}\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -106,6 +108,7 @@ dependencies {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
     }
     implementation (libs.play.services.location)
+    implementation(libs.play.services.auth.base)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     //orbit
@@ -129,6 +132,10 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     //mplibchart
     implementation(libs.mpandroidchart)
+
+    implementation(libs.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
