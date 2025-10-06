@@ -4,7 +4,7 @@ import com.anshul.smartmediaai.data.dao.ExpenseDao
 import com.anshul.smartmediaai.data.entities.ExpenseEntity
 import kotlinx.coroutines.flow.Flow
 
-class ExpenseDataSource(private val dao: ExpenseDao) {
+class ExpenseLocalDataSource(private val dao: ExpenseDao) {
     suspend fun insertExpense(expense: ExpenseEntity) {
         dao.insertExpense(expense)
     }

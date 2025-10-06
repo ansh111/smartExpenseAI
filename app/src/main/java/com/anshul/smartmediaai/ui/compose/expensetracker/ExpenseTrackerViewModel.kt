@@ -40,7 +40,21 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.lifecycle.lifecycleScope
+import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
+import com.anshul.smartmediaai.util.constants.ApiConstants.GMAIL_READ_URL
+import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 
 @HiltViewModel
@@ -58,6 +72,7 @@ class ExpenseTrackerViewModel @Inject constructor(
 
     companion object {
         const val LAST_SYNC_TIME = "last_sync_time"
+        const val TAG = "ExpenseTrackerViewModel"
     }
 
     fun onPermissionResult(granted: Boolean) = intent {
@@ -349,6 +364,64 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
         }.addOnFailureListener {
             onResult(JSONObject().put("error", "Error fetching location"))
+        }
+    }
+
+    internal fun createGoogleSignInWithButton() {
+        val signInWithGoogleOption: GetSignInWithGoogleOption = GetSignInWithGoogleOption.Builder(
+            serverClientId = WEB_CLIENT_ID
+        ).setNonce("")
+            .build()
+
+        val credentialManager = CredentialManager.create(context)
+
+        val request: GetCredentialRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(signInWithGoogleOption)
+            .build()
+
+        intent {
+                try {
+                    val result = credentialManager.getCredential(
+                        request = request,
+                        context = context,
+                    )
+                    handleSignInWithGoogleOption(result)
+                } catch (e: GetCredentialException) {
+                    e.printStackTrace()
+                }
+        }
+
+
+    }
+
+   private fun handleSignInWithGoogleOption(result: GetCredentialResponse) = intent {
+        // Handle the successfully returned credential.
+        val credential = result.credential
+
+        when (credential) {
+            is CustomCredential -> {
+                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    try {
+                        // Use googleIdTokenCredential and extract id to validate and
+                        // authenticate on your server.
+                        val googleIdTokenCredential = GoogleIdTokenCredential
+                            .createFrom(credential.data)
+                        Log.i(TAG,"" +  googleIdTokenCredential.data)
+                        repo.readEmails(googleIdTokenCredential.idToken,GMAIL_READ_URL)
+                    } catch (e: GoogleIdTokenParsingException) {
+                        Log.e(TAG, "Received an invalid google id token response", e)
+                    }
+                } else {
+                    // Catch any unrecognized credential type here.
+                    postSideEffect(ExpenseTrackerSideEffect.ShowToast("Unexpected type of credential"))
+                }
+            }
+
+            else -> {
+                // Catch any unrecognized credential type here.
+                Log.e(TAG, "Unexpected type of credential")
+                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Sign-in failed for user"))
+            }
         }
     }
 

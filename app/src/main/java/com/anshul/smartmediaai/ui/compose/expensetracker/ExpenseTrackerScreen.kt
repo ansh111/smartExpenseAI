@@ -108,6 +108,12 @@ fun ExpenseTrackerScreen(
                 }
             }
 
+            item {
+                GoogleSignInButtonCompose( {
+                    viewModel.createGoogleSignInWithButton()
+                })
+            }
+
             if (state.isLoading) {
                 item {
                     CircularProgressIndicator()

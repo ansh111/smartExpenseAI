@@ -2,7 +2,8 @@ package com.anshul.smartmediaai.core.di
 
 import com.anshul.smartmediaai.core.network.ExpenseService
 import com.anshul.smartmediaai.data.dao.ExpenseDao
-import com.anshul.smartmediaai.data.repository.ExpenseDataSource
+import com.anshul.smartmediaai.data.repository.ExpenseLocalDataSource
+import com.anshul.smartmediaai.data.repository.ExpenseRemoteDataSource
 import com.anshul.smartmediaai.data.repository.ExpenseRepo
 import com.anshul.smartmediaai.data.repository.ExpenseRepoImpl
 import dagger.Module
@@ -18,19 +19,25 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL = "https://jsonplaceholder.typicode.com/"
+    private const val BASE_URL = "https://dummy.com"
 
     @Provides
     @Singleton
-    fun provideExpenseRepository(localDataSource: ExpenseDataSource): ExpenseRepo {
-        return ExpenseRepoImpl(localDataSource)
+    fun provideExpenseRepository(localDataSource: ExpenseLocalDataSource, remoteDataSource: ExpenseRemoteDataSource ): ExpenseRepo {
+        return ExpenseRepoImpl(localDataSource, remoteDataSource)
 
     }
 
     @Provides
     @Singleton
-    fun provideExpenseDataSource(expenseDao: ExpenseDao): ExpenseDataSource {
-        return ExpenseDataSource(expenseDao)
+    fun provideExpenseDataSource(expenseDao: ExpenseDao): ExpenseLocalDataSource {
+        return ExpenseLocalDataSource(expenseDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideExpenseRemoteDataSource(service: ExpenseService): ExpenseRemoteDataSource {
+        return ExpenseRemoteDataSource(service)
     }
 
     @Provides

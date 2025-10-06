@@ -7,4 +7,5 @@ interface ExpenseRepo {
 
     suspend fun getAllExpenses(): Flow<List<ExpenseEntity>>
     suspend fun insertAllExpenses(expenses: List<ExpenseEntity>)
+    suspend fun  readEmails(authHeader: String, url: String)
 }
