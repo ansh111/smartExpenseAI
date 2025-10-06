@@ -1,6 +1,7 @@
 [versions]
 activityComposeVersion = "1.10.1"
 agp = "8.9.1"
+converterGson = "3.0.0"
 core = "12.1.2"
 credentials = "1.6.0-beta01"
 credentialsPlayServicesAuth = "1.6.0-beta01"
@@ -33,6 +34,7 @@ orbitCore = "10.0.0"
 orbitTest = "10.0.0"
 orbitViewmodel = "10.0.0"
 playServicesLocation = "21.3.0"
+retrofit = "3.0.0"
 roomRuntime = "2.7.2"
 workRuntimeKtx = "2.10.3"
 playServicesAuthBase = "18.3.0"
@@ -53,6 +55,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRuntime" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
+converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 core = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:core", version.ref = "core" }
 credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "firebaseAi" }
@@ -85,6 +88,7 @@ orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitTest" }
 orbit-viewmodel = { module = "org.orbit-mvi:orbit-viewmodel", version.ref = "orbitViewmodel" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-auth-base = { group = "com.google.android.gms", name = "play-services-auth-base", version.ref = "playServicesAuthBase" }
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

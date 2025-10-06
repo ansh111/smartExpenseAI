@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
 import com.anshul.smartmediaai.ui.nav.ExpenseNavigation
 import com.anshul.smartmediaai.ui.theme.SmartMediaAITheme
+import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -36,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -48,7 +50,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         createGoogleSignIn()
        // createGoogleSignInWithButton()
-        googleSignInToReadTranscation()
+       // googleSignInToReadTranscation()
         enableEdgeToEdge()
         setContent {
             SmartMediaAITheme {
@@ -130,6 +132,8 @@ class MainActivity : ComponentActivity() {
             .setFilterByAuthorizedAccounts(true)
             .setServerClientId(BuildConfig.WEB_CLIENT_ID)
             .setAutoSelectEnabled(true)
+            .setRequestVerifiedPhoneNumber(false)
+            .setNonce(UUID.randomUUID().toString())
             // nonce string to use when generating a Google ID token
             .build()
 
@@ -186,7 +190,9 @@ class MainActivity : ComponentActivity() {
                             .createFrom(credential.data)
 
                         val accountEmail = googleIdTokenCredential.id
-                        val token = googleIdTokenCredential.idToken
+
+                        val scope = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
+                        val token = GoogleAuthUtil.getToken(this, accountEmail, scope)
 
                         Log.d(TAG, "Signed in as: $accountEmail")
 

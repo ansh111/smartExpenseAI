@@ -123,6 +123,11 @@ dependencies {
     //youtube player
     implementation (libs.core)
 
+    // retrofit
+
+    implementation (libs.retrofit)
+    implementation (libs.converter.gson)
+
     implementation (libs.gson)
     //room db
     implementation(libs.androidx.room.runtime)
