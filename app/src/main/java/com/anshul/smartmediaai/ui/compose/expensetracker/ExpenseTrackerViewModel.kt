@@ -8,7 +8,9 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.provider.Telephony
+import android.util.Base64
 import android.util.Log
+import androidx.activity.result.ActivityResultLauncher
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -48,13 +50,16 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.lifecycleScope
 import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
 import com.anshul.smartmediaai.util.constants.ApiConstants.GMAIL_READ_URL
+import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 
 @HiltViewModel
@@ -73,6 +78,7 @@ class ExpenseTrackerViewModel @Inject constructor(
     companion object {
         const val LAST_SYNC_TIME = "last_sync_time"
         const val TAG = "ExpenseTrackerViewModel"
+        const val GMAIL_SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
     }
 
     fun onPermissionResult(granted: Boolean) = intent {
@@ -176,7 +182,6 @@ class ExpenseTrackerViewModel @Inject constructor(
                 tempExpenses
             }
 
-            val chartHtml = generateCategoryChartHtml(refinedExpenses)
 
             val nativeChart = generateNativeChart(refinedExpenses)
 
@@ -370,7 +375,7 @@ class ExpenseTrackerViewModel @Inject constructor(
     internal fun createGoogleSignInWithButton() {
         val signInWithGoogleOption: GetSignInWithGoogleOption = GetSignInWithGoogleOption.Builder(
             serverClientId = WEB_CLIENT_ID
-        ).setNonce("")
+        ).setNonce(UUID.randomUUID().toString())
             .build()
 
         val credentialManager = CredentialManager.create(context)
@@ -385,7 +390,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                         request = request,
                         context = context,
                     )
-                    handleSignInWithGoogleOption(result)
+                    handleSignInWithGoogleOption(context,result)
                 } catch (e: GetCredentialException) {
                     e.printStackTrace()
                 }
@@ -394,7 +399,8 @@ class ExpenseTrackerViewModel @Inject constructor(
 
     }
 
-   private fun handleSignInWithGoogleOption(result: GetCredentialResponse) = intent {
+   private fun handleSignInWithGoogleOption(context: Context,
+                                            result: GetCredentialResponse) = intent {
         // Handle the successfully returned credential.
         val credential = result.credential
 
@@ -406,8 +412,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                         // authenticate on your server.
                         val googleIdTokenCredential = GoogleIdTokenCredential
                             .createFrom(credential.data)
-                        Log.i(TAG,"" +  googleIdTokenCredential.data)
-                        repo.readEmails(googleIdTokenCredential.idToken,GMAIL_READ_URL)
+
+                        fetchGmailAccessToken(context, googleIdTokenCredential.id)
                     } catch (e: GoogleIdTokenParsingException) {
                         Log.e(TAG, "Received an invalid google id token response", e)
                     }
@@ -421,6 +427,50 @@ class ExpenseTrackerViewModel @Inject constructor(
                 // Catch any unrecognized credential type here.
                 Log.e(TAG, "Unexpected type of credential")
                 postSideEffect(ExpenseTrackerSideEffect.ShowToast("Sign-in failed for user"))
+            }
+        }
+    }
+
+    internal fun fetchGmailAccessToken(
+        context: Context,
+        email: String
+    ) {
+        intent {
+            try {
+                val token = GoogleAuthUtil.getToken(context, email, GMAIL_SCOPE)
+                Log.d(TAG, "Access Token: $token")
+                val bearerToken = "Bearer $token"
+                val response  = repo.readEmails(bearerToken, "debit newer_than:30d")
+
+                response.messages?.forEach { messageItem ->
+                    val getThreadResponse = repo.readThreads(bearerToken, messageItem.threadId)
+                    getThreadResponse.messages?.get(0)?.payload?.parts?.forEach { item ->
+                        val item = item
+                        val subject = item.headers?.find { it.name == "Subject" }?.value
+                        val bodyEncoded = item.body.data
+                        val body = bodyEncoded?.let {
+                            String(Base64.decode(it, Base64.URL_SAFE or Base64.NO_WRAP))
+                        }
+                        println("Subject: $subject\nBody: $body\n")
+                    }
+                    Log.d(TAG, "message" + messageItem.id)
+
+                }
+
+            } catch (e: UserRecoverableAuthException) {
+                Log.w(TAG, "Need user consent to access Gmail", e)
+                // Launch consent screen on main thread
+                withContext(Dispatchers.Main) {
+                    reduce{
+                        state.copy(
+                            gmailConsentIntent = e.intent
+                        )
+                    }
+                }
+            } catch (e: GoogleAuthException) {
+                Log.e(TAG, "GoogleAuthException while fetching token", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Unknown error fetching token", e)
             }
         }
     }

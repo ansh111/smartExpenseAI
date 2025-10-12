@@ -1,6 +1,8 @@
 package com.anshul.smartmediaai.data.repository
 
 import com.anshul.smartmediaai.data.entities.ExpenseEntity
+import com.anshul.smartmediaai.data.model.GmailMessageResponse
+import com.anshul.smartmediaai.data.model.thread.GmailThreadResponse
 import kotlinx.coroutines.flow.Flow
 
 class ExpenseRepoImpl(private val localDataSource: ExpenseLocalDataSource,
@@ -9,8 +11,15 @@ class ExpenseRepoImpl(private val localDataSource: ExpenseLocalDataSource,
        localDataSource.insertAllExpenses(expenses)
     }
 
-    override suspend fun readEmails(authHeader: String, url: String) {
-        remoteDataSource.readEmails(authHeader, url)
+    override suspend fun readEmails(authHeader: String, query: String): GmailMessageResponse {
+        return remoteDataSource.readEmails(authHeader, query)
+    }
+
+    override suspend fun readThreads(
+        authHeader: String,
+        threadId: String
+    ): GmailThreadResponse {
+        return remoteDataSource.readThreads(authHeader,threadId)
     }
 
     override suspend fun getAllExpenses(): Flow<List<ExpenseEntity>> {

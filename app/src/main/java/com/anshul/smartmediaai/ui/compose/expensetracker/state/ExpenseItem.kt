@@ -1,5 +1,8 @@
 package com.anshul.smartmediaai.ui.compose.expensetracker.state
 
+import android.content.Intent
+import com.anshul.smartmediaai.data.model.MessagesItem
+
 data class ExpenseItem( // Define your refined expense data structure
     val merchant: String,
     val amount: Double,
@@ -13,7 +16,10 @@ data class ExpenseTrackerState(
     val errorMessage: String? = null,
     val permissionGranted: Boolean = false,
     val recommendation: String? = null,
-    val nativeChart: Map<String, Double> = emptyMap()
+    val nativeChart: Map<String, Double> = emptyMap(),
+    val isGmailConsentNeeded: Boolean = false,
+    val gmailConsentIntent: Intent? = null,
+    val gmailMessagesId: List<MessagesItem> = emptyList()
 )
 
 sealed class ExpenseTrackerSideEffect {

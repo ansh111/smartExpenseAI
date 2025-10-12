@@ -1,12 +1,9 @@
 package com.anshul.smartmediaai.ui.nav
 
-import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.internal.composableLambda
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerScreen
@@ -17,7 +14,7 @@ import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel
 @Composable
 fun ExpenseNavigation(
     navController: NavHostController,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ){
     NavHost(
         navController = navController,

@@ -1,6 +1,7 @@
 package com.anshul.smartmediaai.ui.compose.expensetracker
 
 import android.Manifest
+import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavController
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
@@ -57,7 +60,7 @@ fun ExpenseTrackerScreen(
     navController: NavController,
     viewModel: ExpenseTrackerViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.container.stateFlow.collectAsState()
+    val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -85,6 +88,28 @@ fun ExpenseTrackerScreen(
 
     }
 
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.fetchGmailAccessToken(context, "")
+
+        } else {
+            Toast.makeText(context, "Google Sign-in failed for user", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+
+    LaunchedEffect(state.gmailConsentIntent) {
+        if(state.gmailConsentIntent !=null){
+            launcher.launch(state.gmailConsentIntent!!)
+            context.startActivity(state.gmailConsentIntent)
+        }
+    }
+
+
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Expense Tracker") },
@@ -110,7 +135,7 @@ fun ExpenseTrackerScreen(
 
             item {
                 GoogleSignInButtonCompose( {
-                    viewModel.createGoogleSignInWithButton()
+                   viewModel.createGoogleSignInWithButton()
                 })
             }
 
