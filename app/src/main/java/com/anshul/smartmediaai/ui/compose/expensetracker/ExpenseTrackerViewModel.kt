@@ -93,9 +93,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    @SuppressLint("SuspiciousIndentation")
     fun scanSmsForExpenses() = intent {
-
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.READ_SMS
@@ -110,7 +108,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         try {
 
             val firstExpense = repo.getAllExpenses().first()
-            val refinedExpenses:  List<ExpenseItem> = if(firstExpense.isNotEmpty()){
+            val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
                 firstExpense.map {
                     ExpenseItem(
                         merchant = it.description,
@@ -119,7 +117,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                         category = it.category.toString()
                     )
                 }
-            }else {
+            } else {
 
                 val smsMessages = readSmsRepo.readSms(0L)
                 if (smsMessages.isEmpty()) {
@@ -127,12 +125,26 @@ class ExpenseTrackerViewModel @Inject constructor(
                     postSideEffect(ExpenseTrackerSideEffect.ShowToast("No relevant SMS found."))
                     return@intent
                 }
+                analyseExpenseData(smsMessages)
+            }) as List<ExpenseItem>
+
+            buildRefinedExpenseData(refinedExpenses)
+
+        } catch (e: Exception){
+
+        }
+    }
+
+    @SuppressLint("SuspiciousIndentation")
+    fun analyseExpenseData(messages : List<String>) = intent {
+
+        try {
 
                 val tempExpenses = mutableListOf<ExpenseItem>()
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
                     .generativeModel("gemini-2.5-pro") // Or your preferred model
                 val batchSize = 10
-                for ((index, batch) in smsMessages.chunked(batchSize).withIndex()) {
+                for ((index, batch) in messages.chunked(batchSize).withIndex()) {
 
                     val prompt = """
                     Extract expense details from each of these SMS messages.
@@ -168,7 +180,6 @@ class ExpenseTrackerViewModel @Inject constructor(
                             println("Error parsing AI response: ${e.message}")
                         }
                     }
-                }
 
                 val expenseEntities = tempExpenses.map { item ->
                     ExpenseEntity(
@@ -184,31 +195,6 @@ class ExpenseTrackerViewModel @Inject constructor(
                 tempExpenses
             }
 
-
-            val nativeChart = generateNativeChart(refinedExpenses)
-
-                reduce {
-                    state.copy(
-                        isLoading = false,
-                        expenses = refinedExpenses,
-                        nativeChart = nativeChart
-                    )
-                }
-
-
-
-            if (refinedExpenses.isNotEmpty()) {
-                val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
-                reduce {
-                    state.copy(
-                        recommendation = recommendations
-                    )
-                }
-                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Expenses extracted.Recommendations ready"))
-            } else {
-                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Could not extract details from SMS."))
-            }
-
         } catch (e: Exception) {
             e.printStackTrace()
             reduce {
@@ -219,6 +205,34 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
             postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))
         }
+    }
+
+    fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>) =  intent{
+
+        val nativeChart = generateNativeChart(refinedExpenses)
+
+        reduce {
+            state.copy(
+                isLoading = false,
+                expenses = refinedExpenses,
+                nativeChart = nativeChart
+            )
+        }
+
+
+
+        if (refinedExpenses.isNotEmpty()) {
+            val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
+            reduce {
+                state.copy(
+                    recommendation = recommendations
+                )
+            }
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Expenses extracted.Recommendations ready"))
+        } else {
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Could not extract details from SMS."))
+        }
+
     }
 
     suspend fun fetchCurrentLocationSuspend(context: Context): JSONObject =
