@@ -141,6 +141,7 @@ dependencies {
     implementation(libs.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    implementation (libs.jsoup)
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

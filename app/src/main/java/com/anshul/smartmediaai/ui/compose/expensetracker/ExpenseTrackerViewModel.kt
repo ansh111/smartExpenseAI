@@ -59,6 +59,8 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingExcept
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.jsoup.Jsoup
+import org.jsoup.safety.Safelist
 import java.util.UUID
 
 
@@ -440,20 +442,26 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val token = GoogleAuthUtil.getToken(context, email, GMAIL_SCOPE)
                 Log.d(TAG, "Access Token: $token")
                 val bearerToken = "Bearer $token"
-                val response  = repo.readEmails(bearerToken, "debit newer_than:30d")
+                val response  = repo.readEmails(bearerToken, "debited newer_than:30d")
+
 
                 response.messages?.forEach { messageItem ->
                     val getThreadResponse = repo.readThreads(bearerToken, messageItem.threadId)
-                    getThreadResponse.messages?.get(0)?.payload?.parts?.forEach { item ->
-                        val item = item
-                        val subject = item.headers?.find { it.name == "Subject" }?.value
-                        val bodyEncoded = item.body.data
-                        val body = bodyEncoded?.let {
-                            String(Base64.decode(it, Base64.URL_SAFE or Base64.NO_WRAP))
+                    val payloadParts = getThreadResponse.messages?.get(0)?.payload
+                    if(payloadParts?.parts.isNullOrEmpty()){
+                        val body = payloadParts?.body?.data
+
+                        val finalText = extractPlainTextFromHtml(decodeString(body!!))
+                        Log.d("Anshul ",finalText  +"")
+                    }else{
+                       payloadParts.parts.forEach {
+                           val finalText = extractPlainTextFromHtml(decodeString(it.body.data))
+                           Log.d("Anshul",finalText)
                         }
-                        println("Subject: $subject\nBody: $body\n")
                     }
-                    Log.d(TAG, "message" + messageItem.id)
+
+
+                 //   Log.d(TAG, "getThreadResponse" + getThreadResponse.messages?.get(0)?.payload)
 
                 }
 
@@ -473,6 +481,25 @@ class ExpenseTrackerViewModel @Inject constructor(
                 Log.e(TAG, "Unknown error fetching token", e)
             }
         }
+    }
+
+    fun decodeString(encoded: String): String {
+        val normalized = encoded.replace('-', '+').replace('_', '/').let {
+            val mod = it.length % 4
+            if (mod == 0) it else it + "=".repeat(4 - mod)
+        }
+        val decodedBytes = Base64.decode(normalized, Base64.DEFAULT)
+        return String(decodedBytes, Charsets.UTF_8)
+
+    }
+
+    fun extractPlainTextFromHtml(html: String): String {
+        // Remove scripts/styles and convert to readable text
+        val doc = Jsoup.parse(html)
+        doc.select("script, style, footer, img, nav").remove() // remove noise
+        return Jsoup.clean(doc.body().html(), Safelist.none())
+            .replace(Regex("\\s+"), " ") // collapse whitespace
+            .trim()
     }
 
 }
