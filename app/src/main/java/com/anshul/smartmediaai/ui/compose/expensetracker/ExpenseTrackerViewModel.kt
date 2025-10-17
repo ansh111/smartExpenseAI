@@ -56,22 +56,25 @@ import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
 import java.util.UUID
+import kotlin.system.measureTimeMillis
 
 
 @HiltViewModel
 class ExpenseTrackerViewModel @Inject constructor(
-    @ApplicationContext private val context: Context ,
+    @ApplicationContext private val context: Context,
     private val gson: Gson,
     private val repo: ExpenseRepo,
     private val readSmsRepo: ReadSmsRepo,
     private val expenseDataFetcher: ExpenseDataFetcher,
-    private  val preferences: SharedPreferences
+    private val preferences: SharedPreferences
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -253,7 +256,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val lat = locationJson.optDouble("latitude")
                 val lon = locationJson.optDouble("longitude")
                 val currentLocation = locationJson.optString("city")
-                val restaurantsJson = expenseDataFetcher.fetchNearbyRestaurants(lat,lon)
+                val restaurantsJson = expenseDataFetcher.fetchNearbyRestaurants(lat, lon)
                 val servicesJson = expenseDataFetcher.fetchNearbyServices(lat, lon)
 
                 val prompt = """
@@ -273,7 +276,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                 5. Give concise, actionable recommendations in ≤50 words.
                 """.trimIndent()
 
-                Log.i("prompt",prompt)
+                Log.i("prompt", prompt)
 
 
                 val requestContent = content { text(prompt) }
@@ -293,67 +296,10 @@ class ExpenseTrackerViewModel @Inject constructor(
     }
 
     private fun generateNativeChart(expenseItem: List<ExpenseItem>): Map<String, Double> {
-        if(expenseItem.isEmpty()) return emptyMap()
+        if (expenseItem.isEmpty()) return emptyMap()
         val aggregatedData = aggregateExpensesByCategory(expenseItem)
         return aggregatedData
 
-    }
-
-    private fun generateCategoryChartHtml(expenseItems: List<ExpenseItem>): String {
-        if(expenseItems.isEmpty()) return ""
-        val aggregatedData = aggregateExpensesByCategory(expenseItems)
-        if (aggregatedData.isEmpty()) return ""
-        val labels = JSONArray(aggregatedData.keys.toList())
-        val dataValues = JSONArray(aggregatedData.values.toList())
-        // Simple background colors for pie chart segments
-        val backgroundColors = JSONArray(listOf(
-            "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40",
-            "#FFCD56", "#C9CBCF", "#3FC77D", "#E7E9ED" // Add more if you expect more categories
-        ).take(aggregatedData.size))
-        return """
-           <!DOCTYPE html>
-           <html>
-           <head>
-               <title>Expense Category Chart</title>
-               <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-               <style>
-                   body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f0f0; }
-                   #categoryChart { max-width: 95%; max-height: 95%; } /* Responsive chart size */
-               </style>
-           </head>
-           <body>
-               <canvas id="categoryChart"></canvas>
-               <script>
-                   const ctx = document.getElementById('categoryChart').getContext('2d');
-                   new Chart(ctx, {
-                       type: 'pie', // You can change to 'bar', 'doughnut', etc.
-                       data: {
-                           labels: $labels,
-                           datasets: [{
-                               label: 'Expenses by Category',
-                               data: $dataValues,
-                               backgroundColor: $backgroundColors,
-                               hoverOffset: 4
-                           }]
-                       },
-                       options: {
-                           responsive: true,
-                           maintainAspectRatio: false, // Allows chart to fill container better
-                           plugins: {
-                               legend: {
-                                   position: 'top', // Or 'bottom', 'left', 'right'
-                               },
-                               title: {
-                                   display: true,
-                                   text: 'Expense Distribution by Category'
-                               }
-                           }
-                       }
-                   });
-               </script>
-           </body>
-           </html>
-           """.trimIndent()
     }
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
@@ -364,7 +310,8 @@ class ExpenseTrackerViewModel @Inject constructor(
             if (location != null) {
                 try {
                     val geocoder = Geocoder(context, Locale.getDefault())
-                    val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                    val addresses =
+                        geocoder.getFromLocation(location.latitude, location.longitude, 1)
 
                     val address = addresses?.firstOrNull()
                     val locationJson = JSONObject().apply {
@@ -401,22 +348,24 @@ class ExpenseTrackerViewModel @Inject constructor(
             .build()
 
         intent {
-                try {
-                    val result = credentialManager.getCredential(
-                        request = request,
-                        context = context,
-                    )
-                    handleSignInWithGoogleOption(context,result)
-                } catch (e: GetCredentialException) {
-                    e.printStackTrace()
-                }
+            try {
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = context,
+                )
+                handleSignInWithGoogleOption(context, result)
+            } catch (e: GetCredentialException) {
+                e.printStackTrace()
+            }
         }
 
 
     }
 
-   private fun handleSignInWithGoogleOption(context: Context,
-                                            result: GetCredentialResponse) = intent {
+    private fun handleSignInWithGoogleOption(
+        context: Context,
+        result: GetCredentialResponse
+    ) = intent {
         // Handle the successfully returned credential.
         val credential = result.credential
 
@@ -456,34 +405,71 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val token = GoogleAuthUtil.getToken(context, email, GMAIL_SCOPE)
                 Log.d(TAG, "Access Token: $token")
                 val bearerToken = "Bearer $token"
-                val response  = repo.readEmails(bearerToken, "debited newer_than:30d")
+                val response = repo.readEmails(bearerToken, "debited newer_than:30d")
 
 
-                response.messages?.forEach { messageItem ->
-                    val getThreadResponse = repo.readThreads(bearerToken, messageItem.threadId)
-                    val payloadParts = getThreadResponse.messages?.get(0)?.payload
-                    if(payloadParts?.parts.isNullOrEmpty()){
-                        val body = payloadParts?.body?.data
+                /* val timeTaken = measureTimeMillis {
+                     response.messages?.distinctBy { it.threadId }?.map { messageItem ->
+                         Log.d("AnshulThreadId ", messageItem.toString())
+                         val getThreadResponse = repo.readThreads(bearerToken, messageItem.threadId)
+                         getThreadResponse.messages?.forEach { payload ->
+                             val payloadParts = payload.payload
+                             if (payloadParts.parts.isNullOrEmpty()) {
+                                 val body = payloadParts.body.data
 
-                        val finalText = extractPlainTextFromHtml(decodeString(body!!))
-                        Log.d("Anshul ",finalText  +"")
-                    }else{
-                       payloadParts.parts.forEach {
-                           val finalText = extractPlainTextFromHtml(decodeString(it.body.data))
-                           Log.d("Anshul",finalText)
-                        }
-                    }
+                                 val finalText = withContext(Dispatchers.Default) {
+                                     extractPlainTextFromHtml(decodeString(body))
+                                 }
+                                 Log.d("Anshul ", finalText + "")
+                             } else {
+                                 payloadParts.parts.forEach {
+                                     val finalText =
+                                         extractPlainTextFromHtml(decodeString(it.body.data))
+                                     Log.d("Anshul++", finalText)
+                                 }
+                             }
+                         }
+                     }
+
+                 }*/
+
+                val allDecodedTexts = coroutineScope {
+                    response.messages
+                        ?.distinctBy { it.threadId } // avoid duplicate calls
+                        ?.map { messageItem ->
+                            async(Dispatchers.IO) {
+                                val threadResponse =
+                                    repo.readThreads(bearerToken, messageItem.threadId)
+                                threadResponse.messages?.flatMap { payload ->
+                                    val payloadParts = payload.payload
+                                    if (payloadParts.parts.isNullOrEmpty()) {
+                                        listOf(
+                                            extractPlainTextFromHtml(decodeString(payloadParts.body.data))
+                                        )
+                                    } else {
+                                        payloadParts.parts.map {
+                                            extractPlainTextFromHtml(decodeString(it.body.data))
+                                        }
+                                    }
+                                } ?: emptyList()
+                            }
+                        }?.awaitAll()?.flatten()?.take(100)
+                } ?: emptyList()
+                Log.d("Anshul", "Fetched ${allDecodedTexts} messages")
+
+                val list = analyseExpenseData(allDecodedTexts) as List<String>
+
+               // buildRefinedExpenseData(refinedExpenses)
 
 
-                 //   Log.d(TAG, "getThreadResponse" + getThreadResponse.messages?.get(0)?.payload)
 
-                }
+                // Update Orbit state or log
 
             } catch (e: UserRecoverableAuthException) {
                 Log.w(TAG, "Need user consent to access Gmail", e)
                 // Launch consent screen on main thread
                 withContext(Dispatchers.Main) {
-                    reduce{
+                    reduce {
                         state.copy(
                             gmailConsentIntent = e.intent
                         )
