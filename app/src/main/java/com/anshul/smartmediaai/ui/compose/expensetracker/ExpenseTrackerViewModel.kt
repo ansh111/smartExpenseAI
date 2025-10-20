@@ -2,15 +2,12 @@ package com.anshul.smartmediaai.ui.compose.expensetracker
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ContentResolver
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
-import android.provider.Telephony
 import android.util.Base64
 import android.util.Log
-import androidx.activity.result.ActivityResultLauncher
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -33,7 +30,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import org.json.JSONArray
 import org.orbitmvi.orbit.Container
 import org.orbitmvi.orbit.ContainerHost
 import org.orbitmvi.orbit.viewmodel.container
@@ -42,29 +38,15 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
-import androidx.credentials.exceptions.GetCredentialException
-import androidx.lifecycle.lifecycleScope
-import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
-import com.anshul.smartmediaai.util.constants.ApiConstants.GMAIL_READ_URL
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import org.jsoup.Jsoup
 import org.jsoup.safety.Safelist
-import java.util.UUID
-import kotlin.system.measureTimeMillis
 
 
 @HiltViewModel
@@ -139,11 +121,9 @@ class ExpenseTrackerViewModel @Inject constructor(
     }
 
     @SuppressLint("SuspiciousIndentation")
-    fun analyseExpenseData(messages : List<String>) = intent {
-
+   suspend fun analyseExpenseData(messages : List<String>) : List<ExpenseItem> {
+        val tempExpenses = mutableListOf<ExpenseItem>()
         try {
-
-                val tempExpenses = mutableListOf<ExpenseItem>()
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
                     .generativeModel("gemini-2.5-pro") // Or your preferred model
                 val batchSize = 10
@@ -195,19 +175,20 @@ class ExpenseTrackerViewModel @Inject constructor(
                 }
                 repo.insertAllExpenses(expenseEntities)
                 preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
-                tempExpenses
+
             }
 
         } catch (e: Exception) {
             e.printStackTrace()
-            reduce {
+          /*  reduce {
                 state.copy(
                     isLoading = false,
                     errorMessage = e.message ?: "Error processing SMS"
                 )
             }
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))*/
         }
+        return tempExpenses
     }
 
     fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>) =  intent{
@@ -335,104 +316,20 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    internal fun createGoogleSignInWithButton() {
-        val signInWithGoogleOption: GetSignInWithGoogleOption = GetSignInWithGoogleOption.Builder(
-            serverClientId = WEB_CLIENT_ID
-        ).setNonce(UUID.randomUUID().toString())
-            .build()
-
-        val credentialManager = CredentialManager.create(context)
-
-        val request: GetCredentialRequest = GetCredentialRequest.Builder()
-            .addCredentialOption(signInWithGoogleOption)
-            .build()
-
-        intent {
-            try {
-                val result = credentialManager.getCredential(
-                    request = request,
-                    context = context,
-                )
-                handleSignInWithGoogleOption(context, result)
-            } catch (e: GetCredentialException) {
-                e.printStackTrace()
-            }
-        }
-
-
-    }
-
-    private fun handleSignInWithGoogleOption(
-        context: Context,
-        result: GetCredentialResponse
-    ) = intent {
-        // Handle the successfully returned credential.
-        val credential = result.credential
-
-        when (credential) {
-            is CustomCredential -> {
-                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                    try {
-                        // Use googleIdTokenCredential and extract id to validate and
-                        // authenticate on your server.
-                        val googleIdTokenCredential = GoogleIdTokenCredential
-                            .createFrom(credential.data)
-
-                        fetchGmailAccessToken(context, googleIdTokenCredential.id)
-                    } catch (e: GoogleIdTokenParsingException) {
-                        Log.e(TAG, "Received an invalid google id token response", e)
-                    }
-                } else {
-                    // Catch any unrecognized credential type here.
-                    postSideEffect(ExpenseTrackerSideEffect.ShowToast("Unexpected type of credential"))
-                }
-            }
-
-            else -> {
-                // Catch any unrecognized credential type here.
-                Log.e(TAG, "Unexpected type of credential")
-                postSideEffect(ExpenseTrackerSideEffect.ShowToast("Sign-in failed for user"))
-            }
-        }
-    }
-
     internal fun fetchGmailAccessToken(
         context: Context,
         email: String
     ) {
         intent {
+
+            reduce {
+                state.copy(isLoading = true)
+            }
             try {
                 val token = GoogleAuthUtil.getToken(context, email, GMAIL_SCOPE)
                 Log.d(TAG, "Access Token: $token")
                 val bearerToken = "Bearer $token"
-                val response = repo.readEmails(bearerToken, "debited newer_than:30d")
-
-
-                /* val timeTaken = measureTimeMillis {
-                     response.messages?.distinctBy { it.threadId }?.map { messageItem ->
-                         Log.d("AnshulThreadId ", messageItem.toString())
-                         val getThreadResponse = repo.readThreads(bearerToken, messageItem.threadId)
-                         getThreadResponse.messages?.forEach { payload ->
-                             val payloadParts = payload.payload
-                             if (payloadParts.parts.isNullOrEmpty()) {
-                                 val body = payloadParts.body.data
-
-                                 val finalText = withContext(Dispatchers.Default) {
-                                     extractPlainTextFromHtml(decodeString(body))
-                                 }
-                                 Log.d("Anshul ", finalText + "")
-                             } else {
-                                 payloadParts.parts.forEach {
-                                     val finalText =
-                                         extractPlainTextFromHtml(decodeString(it.body.data))
-                                     Log.d("Anshul++", finalText)
-                                 }
-                             }
-                         }
-                     }
-
-                 }*/
-
+                val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
                 val allDecodedTexts = coroutineScope {
                     response.messages
                         ?.distinctBy { it.threadId } // avoid duplicate calls
@@ -453,18 +350,12 @@ class ExpenseTrackerViewModel @Inject constructor(
                                     }
                                 } ?: emptyList()
                             }
-                        }?.awaitAll()?.flatten()?.take(100)
+                        }?.awaitAll()?.flatten()
                 } ?: emptyList()
-                Log.d("Anshul", "Fetched ${allDecodedTexts} messages")
+                Log.d("Anshul", "Fetched ${allDecodedTexts.size} messages")
 
-                val list = analyseExpenseData(allDecodedTexts) as List<String>
-
-               // buildRefinedExpenseData(refinedExpenses)
-
-
-
-                // Update Orbit state or log
-
+                val expenseList = analyseExpenseData(allDecodedTexts)
+                buildRefinedExpenseData(expenseList)
             } catch (e: UserRecoverableAuthException) {
                 Log.w(TAG, "Need user consent to access Gmail", e)
                 // Launch consent screen on main thread

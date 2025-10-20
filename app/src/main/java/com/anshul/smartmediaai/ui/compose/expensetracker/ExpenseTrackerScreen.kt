@@ -2,6 +2,7 @@ package com.anshul.smartmediaai.ui.compose.expensetracker
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,15 +45,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavController
+import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
+import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.TAG
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect.ShowToast
 import com.anshul.smartmediaai.ui.nav.Screen
 import com.anshul.smartmediaai.ui.theme.PrimaryBlue
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.orbitmvi.orbit.compose.collectSideEffect
+import java.util.UUID
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +78,7 @@ fun ExpenseTrackerScreen(
 ) {
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -108,6 +125,70 @@ fun ExpenseTrackerScreen(
         }
     }
 
+    fun handleSignInWithGoogleOption( context: Context,
+                                      result: GetCredentialResponse) {
+        // Handle the successfully returned credential.
+        val credential = result.credential
+
+        when (credential) {
+            is CustomCredential -> {
+                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    try {
+                        // Use googleIdTokenCredential and extract id to validate and
+                        // authenticate on your server.
+                        val googleIdTokenCredential = GoogleIdTokenCredential
+                            .createFrom(credential.data)
+
+                        viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                    } catch (e: GoogleIdTokenParsingException) {
+                        Log.e(TAG, "Received an invalid google id token response", e)
+                    }
+                } else {
+                    // Catch any unrecognized credential type here.
+                    //  postSideEffect(ExpenseTrackerSideEffect.ShowToast("Unexpected type of credential"))
+                }
+            }
+
+            else -> {
+                // Catch any unrecognized credential type here.
+                Log.e(TAG, "Unexpected type of credential")
+                //  postSideEffect(ExpenseTrackerSideEffect.ShowToast("Sign-in failed for user"))
+            }
+        }
+    }
+
+    fun createGoogleSignInWithButton() {
+
+        val activity = context as? Activity ?: return
+        val signInWithGoogleOption: GetSignInWithGoogleOption = GetSignInWithGoogleOption.Builder(
+            serverClientId = WEB_CLIENT_ID
+        ).setNonce(UUID.randomUUID().toString())
+            .build()
+
+
+        val credentialManager = CredentialManager.create(activity)
+
+        val request: GetCredentialRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(signInWithGoogleOption)
+            .build()
+
+        coroutineScope.launch {
+            try {
+
+                val result = withContext(Dispatchers.IO) {
+                    credentialManager.getCredential(
+                        request = request,
+                        context = activity,
+                    )
+                }
+                handleSignInWithGoogleOption(activity, result)
+            } catch (e: GetCredentialException) {
+                e.printStackTrace()
+            }
+        }
+
+    }
+
 
 
     Scaffold(
@@ -135,7 +216,7 @@ fun ExpenseTrackerScreen(
 
             item {
                 GoogleSignInButtonCompose( {
-                   viewModel.createGoogleSignInWithButton()
+                   createGoogleSignInWithButton()
                 })
             }
 
