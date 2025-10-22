@@ -7,6 +7,7 @@ credentials = "1.6.0-beta01"
 credentialsPlayServicesAuth = "1.6.0-beta01"
 firebaseAi = "17.1.0"
 firebaseBom = "34.1.0"
+firebaseBomVersion = "34.4.0"
 googleid = "1.1.1"
 gson = "2.11.0"
 jsoup = "1.17.2"
@@ -27,6 +28,7 @@ media3Exoplayer = "1.8.0"
 media3Transformer = "1.8.0"
 media3Ui = "1.8.0"
 hilt = "2.55"
+crashlytics = "3.0.6"
 hiltNavigationCompose = "1.2.0"
 mpandroidchart = "v3.1.0"
 navigationCompose = "2.9.3"
@@ -62,7 +64,10 @@ credentials = { module = "androidx.credentials:credentials", version.ref = "cred
 firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "firebaseAi" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-bom-v3440 = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBomVersion" }
+firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
 firebase-vertexai = { module = "com.google.firebase:firebase-vertexai" }
+google-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
@@ -98,3 +103,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-service = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+firebase-crashlytics = {id = "com.google.firebase.crashlytics", version.ref ="crashlytics"}

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.service)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.firebase.crashlytics)
     kotlin("kapt") // Hilt needs kapt
 }
 
@@ -142,6 +143,15 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation (libs.jsoup)
+
+    //firebase
+    // Import the BoM for the Firebase platform
+    implementation(platform(libs.firebase.bom.v3440))
+
+    // Add the dependencies for the Crashlytics NDK and Analytics libraries
+    // When using the BoM, you don't specify versions in Firebase library dependencies
+    implementation(libs.firebase.crashlytics.ndk)
+    implementation(libs.google.firebase.analytics)
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
