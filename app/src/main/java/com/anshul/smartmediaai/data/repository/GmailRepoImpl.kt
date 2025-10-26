@@ -119,20 +119,21 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                     }
                 }
 
-                val expenseEntities = tempExpenses.map { item ->
-                    ExpenseEntity(
-                        description = item.merchant,
-                        amount = item.amount,
-                        date = item.date,
-                        category = item.category,
-                        timestamp = System.currentTimeMillis()
-                    )
 
-                }
-                repo.insertAllExpenses(expenseEntities)
-                sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
 
             }
+
+            val expenseEntities = tempExpenses.map { item ->
+                ExpenseEntity(
+                    description = item.merchant,
+                    amount = item.amount,
+                    date = item.date,
+                    category = item.category
+                )
+
+            }
+            repo.insertAllExpenses(expenseEntities)
+            sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
 
         } catch (e: Exception) {
             e.printStackTrace()
@@ -144,6 +145,7 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
               }
               postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))*/
         }
+
         return tempExpenses
     }
 

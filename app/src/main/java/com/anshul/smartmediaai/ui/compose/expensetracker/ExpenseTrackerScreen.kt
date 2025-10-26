@@ -175,7 +175,8 @@ fun ExpenseTrackerScreen(
                             putString(EMAIL_PREFS, googleIdTokenCredential.id)
                         }
 
-                        viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                      //  viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                        viewModel.fechGmailData(context)
                     } catch (e: GoogleIdTokenParsingException) {
                         Log.e(TAG, "Received an invalid google id token response", e)
                     }

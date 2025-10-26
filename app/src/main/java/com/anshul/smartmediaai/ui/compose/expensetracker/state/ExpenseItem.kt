@@ -7,7 +7,8 @@ data class ExpenseItem( // Define your refined expense data structure
     val merchant: String,
     val amount: Double,
     val date: String,
-    val category: String
+    val category: String,
+    val timestamp: Long = 0L
 )
 
 data class ExpenseTrackerState(

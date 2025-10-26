@@ -172,8 +172,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                         description = item.merchant,
                         amount = item.amount,
                         date = item.date,
-                        category = item.category,
-                        timestamp = System.currentTimeMillis()
+                        category = item.category
                     )
 
                 }
@@ -327,9 +326,21 @@ class ExpenseTrackerViewModel @Inject constructor(
                 state.copy(isLoading = true)
             }
             try {
-               // val lastStoredItem = repo.getAllExpenses().last()
-                val result = gmailRepo.readMails(context, 0L)
-                buildRefinedExpenseData(result)
+                val firstExpense = repo.getAllExpenses().first()
+                val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
+                    firstExpense.map {
+                        ExpenseItem(
+                            merchant = it.description,
+                            amount = it.amount,
+                            date = it.date,
+                            category = it.category.toString()
+                        )
+                    }
+                } else {
+                    gmailRepo.readMails(context, 0L)
+                }) as List<ExpenseItem>
+               // val result = gmailRepo.readMails(context, 0L)
+                buildRefinedExpenseData(refinedExpenses)
             }catch (e: UserRecoverableAuthException) {
                 Log.w(TAG, "Need user consent to access Gmail", e)
                 // Launch consent screen on main thread

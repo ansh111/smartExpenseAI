@@ -23,7 +23,6 @@ object DatabaseModule {
                 ExpenseAnalyserDB::class.java,
                 "expense_analyser_db"
             ).fallbackToDestructiveMigration(false)
-            .addMigrations(MIGRATION_1_2)
             .build()
     }
 
