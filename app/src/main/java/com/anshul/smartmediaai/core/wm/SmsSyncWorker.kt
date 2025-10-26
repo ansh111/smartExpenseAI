@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.anshul.smartmediaai.data.repository.ReadSmsRepo
 import androidx.core.content.edit
+import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.LAST_SYNC_TIME
 
 class SmsSyncWorker(
     appContext: Context,
@@ -15,7 +16,7 @@ class SmsSyncWorker(
 
     companion object {
         const val TAG = "SmsSyncWorker"
-        const val LAST_SYNC_TIME = "last_sync_time"
+
     }
 
 

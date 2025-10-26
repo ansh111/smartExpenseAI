@@ -11,6 +11,5 @@ class SmartMediaAIApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Firebase.initialize(this)
-        WebView.setWebContentsDebuggingEnabled(true)
     }
 }

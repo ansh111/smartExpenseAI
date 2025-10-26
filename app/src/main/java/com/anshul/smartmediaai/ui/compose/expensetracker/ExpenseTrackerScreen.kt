@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ThumbUp
@@ -34,7 +33,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -44,40 +42,56 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
+import androidx.credentials.PasswordCredential
+import androidx.credentials.PublicKeyCredential
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavController
+import com.anshul.smartmediaai.BuildConfig
 import com.anshul.smartmediaai.BuildConfig.WEB_CLIENT_ID
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.TAG
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.smartmediaai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect.ShowToast
 import com.anshul.smartmediaai.ui.nav.Screen
 import com.anshul.smartmediaai.ui.theme.PrimaryBlue
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.orbitmvi.orbit.compose.collectSideEffect
 import java.util.UUID
+import androidx.core.content.edit
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.anshul.smartmediaai.core.wm.GmailSyncWorker
+import com.anshul.smartmediaai.util.constants.ExpenseConstant.EMAIL_PREFS
+import com.anshul.smartmediaai.util.constants.ExpenseConstant.EXPENSE_SHARED_PREFS
+import com.anshul.smartmediaai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_IN_PREF
+import java.util.concurrent.TimeUnit
 
 
+private const val TAG = "ExpenseTrackerScreen"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseTrackerScreen(
     navController: NavController,
     viewModel: ExpenseTrackerViewModel = hiltViewModel(),
 ) {
+
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val sp = context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
     val coroutineScope = rememberCoroutineScope()
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -125,6 +139,24 @@ fun ExpenseTrackerScreen(
         }
     }
 
+    fun scheduleWorkManager() {
+        val workRequest = PeriodicWorkRequestBuilder<GmailSyncWorker>(
+            1, TimeUnit.DAYS // Run once every 24 hours
+        )
+            .setInitialDelay(1, TimeUnit.HOURS) // optional delay before first run
+            .addTag("gmail_sync_worker") // optional tag to identify it
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "gmail_sync_worker",
+            ExistingPeriodicWorkPolicy.KEEP, // keep existing if already scheduled
+            workRequest
+        )
+    }
+    LaunchedEffect (Unit){
+        scheduleWorkManager()
+    }
+
     fun handleSignInWithGoogleOption( context: Context,
                                       result: GetCredentialResponse) {
         // Handle the successfully returned credential.
@@ -138,6 +170,10 @@ fun ExpenseTrackerScreen(
                         // authenticate on your server.
                         val googleIdTokenCredential = GoogleIdTokenCredential
                             .createFrom(credential.data)
+
+                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE).edit {
+                            putString(EMAIL_PREFS, googleIdTokenCredential.id)
+                        }
 
                         viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
                     } catch (e: GoogleIdTokenParsingException) {
@@ -155,6 +191,89 @@ fun ExpenseTrackerScreen(
                 //  postSideEffect(ExpenseTrackerSideEffect.ShowToast("Sign-in failed for user"))
             }
         }
+    }
+
+
+    fun handleSignIn(result: GetCredentialResponse) {
+        // Handle the successfully returned credential.
+        val credential = result.credential
+        val responseJson: String
+
+        when (credential) {
+
+            // Passkey credential
+            is PublicKeyCredential -> {
+                // Share responseJson such as a GetCredentialResponse to your server to validate and
+                // authenticate
+                responseJson = credential.authenticationResponseJson
+            }
+
+            // Password credential
+            is PasswordCredential -> {
+                // Send ID and password to your server to validate and authenticate.
+                val username = credential.id
+                val password = credential.password
+            }
+
+            // GoogleIdToken credential
+            is CustomCredential -> {
+                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    try {
+                        // Use googleIdTokenCredential and extract the ID to validate and
+                        // authenticate on your server.
+                        val googleIdTokenCredential = GoogleIdTokenCredential
+                            .createFrom(credential.data)
+
+                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE).edit {
+                            putString(EMAIL_PREFS, googleIdTokenCredential.id)
+                        }
+                       // viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                        viewModel.fechGmailData(context)
+                    } catch (e: GoogleIdTokenParsingException) {
+                        Log.e(TAG, "Received an invalid google id token response", e)
+                    }
+                } else {
+                    // Catch any unrecognized custom credential type here.
+                    Log.e(TAG, "Unexpected type of credential")
+                }
+            }
+
+            else -> {
+                // Catch any unrecognized credential type here.
+                Log.e(TAG, "Unexpected type of credential")
+            }
+        }
+    }
+
+
+     fun createGoogleSignIn() {
+        val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(true)
+            .setServerClientId(BuildConfig.WEB_CLIENT_ID)
+            .setAutoSelectEnabled(true)
+            // nonce string to use when generating a Google ID token
+            .build()
+
+        val credentialManager = CredentialManager.create(context)
+
+        val request: GetCredentialRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        coroutineScope.launch {
+            coroutineScope {
+                try {
+                    val result = credentialManager.getCredential(
+                        request = request,
+                        context = context,
+                    )
+                    handleSignIn(result)
+                } catch (e: GetCredentialException) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
     }
 
     fun createGoogleSignInWithButton() {
@@ -216,7 +335,13 @@ fun ExpenseTrackerScreen(
 
             item {
                 GoogleSignInButtonCompose( {
-                   createGoogleSignInWithButton()
+                   if(sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)){
+                       createGoogleSignInWithButton()
+                       sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
+                   } else {
+                       createGoogleSignIn()
+
+                   }
                 })
             }
 
@@ -302,6 +427,7 @@ fun ExpenseTrackerScreen(
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview

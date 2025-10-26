@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
-import android.util.Base64
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
@@ -38,6 +37,9 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
+import com.anshul.smartmediaai.data.repository.GmailRepo
+import com.anshul.smartmediaai.util.HelperFunctions.decodeString
+import com.anshul.smartmediaai.util.HelperFunctions.extractPlainTextFromHtml
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
@@ -45,8 +47,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import org.jsoup.Jsoup
-import org.jsoup.safety.Safelist
+import kotlinx.coroutines.flow.last
 
 
 @HiltViewModel
@@ -56,7 +57,8 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val repo: ExpenseRepo,
     private val readSmsRepo: ReadSmsRepo,
     private val expenseDataFetcher: ExpenseDataFetcher,
-    private val preferences: SharedPreferences
+    private val preferences: SharedPreferences,
+    private val gmailRepo : GmailRepo
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -124,6 +126,7 @@ class ExpenseTrackerViewModel @Inject constructor(
    suspend fun analyseExpenseData(messages : List<String>) : List<ExpenseItem> {
         val tempExpenses = mutableListOf<ExpenseItem>()
         try {
+            Log.d("ThreadCheck", "loadUserData() on thread: ${Thread.currentThread().name}")
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
                     .generativeModel("gemini-2.5-pro") // Or your preferred model
                 val batchSize = 10
@@ -169,7 +172,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                         description = item.merchant,
                         amount = item.amount,
                         date = item.date,
-                        category = item.category
+                        category = item.category,
+                        timestamp = System.currentTimeMillis()
                     )
 
                 }
@@ -261,6 +265,7 @@ class ExpenseTrackerViewModel @Inject constructor(
 
 
                 val requestContent = content { text(prompt) }
+
                 val response = generativeModel.generateContent(requestContent)
 
                 return@withContext response.text
@@ -314,6 +319,35 @@ class ExpenseTrackerViewModel @Inject constructor(
         }.addOnFailureListener {
             onResult(JSONObject().put("error", "Error fetching location"))
         }
+    }
+
+    internal fun fechGmailData(context: Context) {
+        intent {
+            reduce {
+                state.copy(isLoading = true)
+            }
+            try {
+               // val lastStoredItem = repo.getAllExpenses().last()
+                val result = gmailRepo.readMails(context, 0L)
+                buildRefinedExpenseData(result)
+            }catch (e: UserRecoverableAuthException) {
+                Log.w(TAG, "Need user consent to access Gmail", e)
+                // Launch consent screen on main thread
+                withContext(Dispatchers.Main) {
+                    reduce {
+                        state.copy(
+                            gmailConsentIntent = e.intent
+                        )
+                    }
+                }
+            } catch (e: GoogleAuthException) {
+                Log.e(TAG, "GoogleAuthException while fetching token", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Unknown error fetching token", e)
+            }
+
+        }
+
     }
 
     internal fun fetchGmailAccessToken(
@@ -374,23 +408,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    fun decodeString(encoded: String): String {
-        val normalized = encoded.replace('-', '+').replace('_', '/').let {
-            val mod = it.length % 4
-            if (mod == 0) it else it + "=".repeat(4 - mod)
-        }
-        val decodedBytes = Base64.decode(normalized, Base64.DEFAULT)
-        return String(decodedBytes, Charsets.UTF_8)
 
-    }
 
-    fun extractPlainTextFromHtml(html: String): String {
-        // Remove scripts/styles and convert to readable text
-        val doc = Jsoup.parse(html)
-        doc.select("script, style, footer, img, nav").remove() // remove noise
-        return Jsoup.clean(doc.body().html(), Safelist.none())
-            .replace(Regex("\\s+"), " ") // collapse whitespace
-            .trim()
-    }
 
 }

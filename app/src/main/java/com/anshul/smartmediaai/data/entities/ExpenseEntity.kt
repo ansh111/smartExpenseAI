@@ -10,5 +10,6 @@ data class ExpenseEntity (
     val description: String,
     val amount: Double,
     val date: String,
-    val category: String? = null
+    val category: String? = null,
+    val timestamp: Long = 0L
 )

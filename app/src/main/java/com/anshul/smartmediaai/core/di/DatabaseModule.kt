@@ -3,6 +3,7 @@ package com.anshul.smartmediaai.core.di
 import android.content.Context
 import androidx.room.Room
 import com.anshul.smartmediaai.data.db.ExpenseAnalyserDB
+import com.anshul.smartmediaai.data.db.MIGRATION_1_2
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,6 +23,7 @@ object DatabaseModule {
                 ExpenseAnalyserDB::class.java,
                 "expense_analyser_db"
             ).fallbackToDestructiveMigration(false)
+            .addMigrations(MIGRATION_1_2)
             .build()
     }
 
