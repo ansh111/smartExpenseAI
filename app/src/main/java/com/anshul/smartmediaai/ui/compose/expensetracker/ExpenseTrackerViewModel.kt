@@ -327,6 +327,12 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
             try {
                 val firstExpense = repo.getAllExpenses().first()
+                val lastSyncTime = preferences.getLong(LAST_SYNC_TIME,0L)
+                // use case is when current time is not equal to  saved time then get the delta transactions
+                if(lastSyncTime != System.currentTimeMillis() && firstExpense.isNotEmpty()){
+                    gmailRepo.readMails(context, lastSyncTime)
+                }
+
                 val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
                     firstExpense.map {
                         ExpenseItem(
