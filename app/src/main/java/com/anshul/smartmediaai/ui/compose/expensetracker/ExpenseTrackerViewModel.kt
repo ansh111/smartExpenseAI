@@ -47,7 +47,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.last
 
 
 @HiltViewModel
@@ -101,7 +100,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                         merchant = it.description,
                         amount = it.amount,
                         date = it.date,
-                        category = it.category.toString()
+                        category = it.category.toString(),
+                        messageId = it.messageId
                     )
                 }
             } else {
@@ -172,7 +172,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                         description = item.merchant,
                         amount = item.amount,
                         date = item.date,
-                        category = item.category
+                        category = item.category,
+                        messageId = item.messageId
                     )
 
                 }
@@ -320,7 +321,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    internal fun fechGmailData(context: Context) {
+    internal fun fetchGmailData(context: Context) {
         intent {
             reduce {
                 state.copy(isLoading = true)
@@ -339,7 +340,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                             merchant = it.description,
                             amount = it.amount,
                             date = it.date,
-                            category = it.category.toString()
+                            category = it.category.toString(),
+                            messageId = it.messageId
                         )
                     }
                 } else {

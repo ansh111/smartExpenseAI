@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
 import com.anshul.smartmediaai.data.entities.ExpenseEntity
+import com.anshul.smartmediaai.data.model.thread.DecodeMessages
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.GMAIL_SCOPE
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.LAST_SYNC_TIME
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.TAG
@@ -43,11 +44,11 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
         } else {
             repo.readEmails(
                 bearerToken,
-                "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance after:${lastSyncTimestamp} before:${System.currentTimeMillis()}"
+                "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance after:${lastSyncTimestamp/1000} before:${System.currentTimeMillis()/1000}"
             )
         }
            // val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
-            val allDecodedTexts = withContext(Dispatchers.Default) {
+            val allDecodedTexts: List<DecodeMessages> = withContext(Dispatchers.Default) {
                 response.messages
                     ?.distinctBy { it.threadId } // avoid duplicate calls
                     ?.map { messageItem ->
@@ -58,14 +59,22 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                                 val payloadParts = payload.payload
                                 if (payloadParts.parts.isNullOrEmpty()) {
                                     listOf(
-                                        extractPlainTextFromHtml(decodeString(payloadParts.body.data))
+                                        DecodeMessages(
+                                            messageId = payload.id,
+                                            message = extractPlainTextFromHtml(decodeString(payloadParts.body.data))
+                                        )
+                                      //  extractPlainTextFromHtml(decodeString(payloadParts.body.data))
                                     )
                                 } else {
                                     payloadParts.parts.map {
-                                        extractPlainTextFromHtml(decodeString(it.body.data))
+                                        DecodeMessages(
+                                            messageId = payload.id,
+                                            message = extractPlainTextFromHtml(decodeString(it.body.data))
+                                        )
+                                      //  extractPlainTextFromHtml(decodeString(it.body.data))
                                     }
                                 }
-                            } ?: emptyList()
+                            } ?: emptyList<DecodeMessages>()
                         }
                     }?.awaitAll()?.flatten()
             } ?: emptyList()
@@ -75,7 +84,7 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
     }
 
     @SuppressLint("SuspiciousIndentation")
-    suspend fun analyseExpenseData(messages: List<String>, sp: SharedPreferences): List<ExpenseItem> {
+    suspend fun analyseExpenseData(messages: List<DecodeMessages>, sp: SharedPreferences): List<ExpenseItem> {
         val tempExpenses = mutableListOf<ExpenseItem>()
         try {
             Log.d("ThreadCheck", "loadUserData() on thread: ${Thread.currentThread().name}")
@@ -83,17 +92,30 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                 .generativeModel("gemini-2.5-pro") // Or your preferred model
             val batchSize = 10
             for ((index, batch) in messages.chunked(batchSize).withIndex()) {
-
                 val prompt = """
-                    Extract expense details from each of these SMS messages.
-                    For each SMS, identify the merchant, amount, date, and categorize the expense (e.g., Food, Shopping, Bills, Travel, Other).
-                    If you cannot determine a value, use "N/A".
-                    Return the output as a JSON array of objects. Each object should have keys:
-                    "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
+            You are a data extraction assistant.
+            Extract expense details from each message below.
+            For each message, read its "text" and use the provided "messageId" to return consistent results.
             
-                    SMS messages:
-                    ${batch.joinToString("\n\n")}
-                """.trimIndent()
+            For each message, identify:
+            - merchant
+            - amount (as number)
+            - date (YYYY-MM-DD if possible)
+            - category (Food, Shopping, Bills, Travel, Other)
+            If not found, use "N/A".
+            
+            Return ONLY a valid JSON array of objects.
+            Each object must have exactly these keys:
+            "messageId", "merchant", "amount", "date", "category".
+            
+            Messages:
+            [
+            ${batch.joinToString(",\n") { msg ->
+                                """{"messageId": "${msg.messageId}", "text": "${msg.message.replace("\"", "\\\"")}"}"""
+                            }}
+            ]
+            """.trimIndent()
+
 
                 val requestContent = content { text(prompt) }
                 val response =
@@ -128,12 +150,16 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                     description = item.merchant,
                     amount = item.amount,
                     date = item.date,
-                    category = item.category
+                    category = item.category,
+                    messageId = item.messageId
+
                 )
 
             }
-            repo.insertAllExpenses(expenseEntities)
-            sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+            if(tempExpenses.isNotEmpty()) {
+                repo.insertAllExpenses(expenseEntities)
+                sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+            }
 
         } catch (e: Exception) {
             e.printStackTrace()
