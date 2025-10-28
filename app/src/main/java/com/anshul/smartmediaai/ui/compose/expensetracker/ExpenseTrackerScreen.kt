@@ -74,6 +74,7 @@ import androidx.core.content.edit
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.anshul.smartmediaai.core.wm.CleanUpWorker
 import com.anshul.smartmediaai.core.wm.GmailSyncWorker
 import com.anshul.smartmediaai.util.constants.ExpenseConstant.EMAIL_PREFS
 import com.anshul.smartmediaai.util.constants.ExpenseConstant.EXPENSE_SHARED_PREFS
@@ -152,10 +153,29 @@ fun ExpenseTrackerScreen(
             ExistingPeriodicWorkPolicy.KEEP, // keep existing if already scheduled
             workRequest
         )
+
+
+        val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
+            1, TimeUnit.DAYS
+        ).build()
+
+        WorkManager.getInstance(context)
+            .enqueueUniquePeriodicWork(
+                "cleanup_old_expenses",
+                ExistingPeriodicWorkPolicy.KEEP,
+                cleanupRequest
+            )
+
+
     }
     LaunchedEffect (Unit){
         scheduleWorkManager()
     }
+
+    LaunchedEffect(Unit) {
+        viewModel.delete30DaysOldExpenses()
+    }
+
 
     fun handleSignInWithGoogleOption( context: Context,
                                       result: GetCredentialResponse) {
@@ -328,11 +348,11 @@ fun ExpenseTrackerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
+           /* item {
                 Button(onClick = { viewModel.scanSmsForExpenses() }) {
                     Text("Scan SMS for Expenses")
                 }
-            }
+            }*/
 
             item {
                 GoogleSignInButtonCompose( {

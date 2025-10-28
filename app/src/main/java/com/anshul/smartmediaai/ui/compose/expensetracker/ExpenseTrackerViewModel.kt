@@ -69,6 +69,10 @@ class ExpenseTrackerViewModel @Inject constructor(
         const val GMAIL_SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
     }
 
+    internal suspend fun delete30DaysOldExpenses() {
+        repo.delete30DaysOldExpenses()
+    }
+
     fun onPermissionResult(granted: Boolean) = intent {
         reduce { state.copy(permissionGranted = granted) }
         if (granted) {

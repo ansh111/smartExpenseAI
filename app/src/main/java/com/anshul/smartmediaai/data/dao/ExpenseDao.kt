@@ -26,10 +26,13 @@ interface ExpenseDao {
 
     @Query("SELECT * FROM expenses WHERE messageId = :id")
     fun getExpenseById(id: Long): Flow<ExpenseEntity>
-    @Query("SELECT * FROM expenses ORDER BY date DESC")
+    @Query("SELECT * FROM expenses WHERE date(date) >= date('now', '-30 day') ORDER BY date DESC")
     fun getAllExpenses(): Flow<List<ExpenseEntity>>
 
     @Query("DELETE FROM expenses")
     suspend fun clearAllExpenses()
+
+    @Query("DELETE FROM expenses WHERE date < :thresholdDate")
+    suspend fun deleteOldExpenses(thresholdDate: Long)
 
 }

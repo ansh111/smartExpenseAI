@@ -29,4 +29,9 @@ class ExpenseLocalDataSource(private val dao: ExpenseDao) {
      fun getExpenseById(id: Long): Flow<ExpenseEntity> {
       return  dao.getExpenseById(id)
     }
+
+    suspend fun deleteOldExpenses(thresholdDate: Long) {
+        dao.deleteOldExpenses(thresholdDate)
+    }
+
 }

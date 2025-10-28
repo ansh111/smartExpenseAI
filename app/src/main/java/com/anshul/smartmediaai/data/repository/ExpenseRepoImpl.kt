@@ -22,7 +22,15 @@ class ExpenseRepoImpl(private val localDataSource: ExpenseLocalDataSource,
         return remoteDataSource.readThreads(authHeader,threadId)
     }
 
+    override suspend fun delete30DaysOldExpenses() {
+        val thirtyDaysAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        return localDataSource.deleteOldExpenses(thirtyDaysAgo)
+    }
+
     override suspend fun getAllExpenses(): Flow<List<ExpenseEntity>> {
         return localDataSource.getAllExpenses()
     }
+
+
+
 }

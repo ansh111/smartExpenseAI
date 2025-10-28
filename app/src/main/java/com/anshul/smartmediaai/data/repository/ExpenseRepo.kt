@@ -11,4 +11,5 @@ interface ExpenseRepo {
     suspend fun insertAllExpenses(expenses: List<ExpenseEntity>)
     suspend fun  readEmails(authHeader: String, query: String): GmailMessageResponse
     suspend fun  readThreads(authHeader: String, threadId: String): GmailThreadResponse
+    suspend fun  delete30DaysOldExpenses()
 }
