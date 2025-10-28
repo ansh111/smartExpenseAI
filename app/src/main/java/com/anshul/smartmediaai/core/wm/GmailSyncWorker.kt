@@ -17,7 +17,6 @@ class GmailSyncWorker @Inject constructor(private val appContext: Context, worke
            val sp = applicationContext.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
            val lastSyncTimestamp = sp.getLong(LAST_SYNC_TIME,0L)
            repo.readMails(appContext, lastSyncTimestamp)
-           sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
 
        } catch (e : Exception){
            return Result.failure()
