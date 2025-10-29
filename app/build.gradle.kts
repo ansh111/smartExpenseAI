@@ -22,12 +22,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    splits {
-        abi {
-            isEnable = false
-            isUniversalApk = true
-        }
-    }
 
     buildTypes {
         debug {
@@ -36,7 +30,7 @@ android {
             buildConfigField("String","WEB_CLIENT_ID","\"${project.findProperty("WEB_CLIENT_ID") ?: ""}\"")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             buildConfigField("String", "GEMINI_API_KEY", "\"${project.findProperty("GEMINI_API_KEY") ?: ""}\"")
             buildConfigField("String", "GOOGLE_API_KEY", "\"${project.findProperty("GOOGLE_API_KEY") ?: ""}\"")
             buildConfigField("String","WEB_CLIENT_ID","\"${project.findProperty("WEB_CLIENT_ID") ?: ""}\"")

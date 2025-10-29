@@ -155,7 +155,7 @@ fun ExpenseTrackerScreen(
         )
 
 
-        val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
+       /* val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
             1, TimeUnit.DAYS
         ).build()
 
@@ -165,7 +165,7 @@ fun ExpenseTrackerScreen(
                 ExistingPeriodicWorkPolicy.KEEP,
                 cleanupRequest
             )
-
+*/
 
     }
     LaunchedEffect (Unit){
