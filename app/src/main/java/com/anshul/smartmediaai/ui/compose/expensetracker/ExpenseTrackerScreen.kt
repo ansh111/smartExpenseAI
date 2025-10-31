@@ -1,5 +1,6 @@
 package com.anshul.smartmediaai.ui.compose.expensetracker
 
+import AnimatedRecommendationLoaderM3
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -8,6 +9,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +36,7 @@ import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +86,7 @@ import java.util.concurrent.TimeUnit
 
 
 private const val TAG = "ExpenseTrackerScreen"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseTrackerScreen(
@@ -108,7 +112,7 @@ fun ExpenseTrackerScreen(
     }
 
     viewModel.collectSideEffect { sideEffect ->
-        when(sideEffect){
+        when (sideEffect) {
             is ShowToast -> {
                 Toast.makeText(context, sideEffect.message, Toast.LENGTH_SHORT).show()
             }
@@ -122,8 +126,7 @@ fun ExpenseTrackerScreen(
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        result ->
+    ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             viewModel.fetchGmailAccessToken(context, "")
 
@@ -134,42 +137,10 @@ fun ExpenseTrackerScreen(
     }
 
     LaunchedEffect(state.gmailConsentIntent) {
-        if(state.gmailConsentIntent !=null){
+        if (state.gmailConsentIntent != null) {
             launcher.launch(state.gmailConsentIntent!!)
             context.startActivity(state.gmailConsentIntent)
         }
-    }
-
-    fun scheduleWorkManager() {
-        val workRequest = PeriodicWorkRequestBuilder<GmailSyncWorker>(
-            1, TimeUnit.DAYS // Run once every 24 hours
-        )
-            .setInitialDelay(1, TimeUnit.HOURS) // optional delay before first run
-            .addTag("gmail_sync_worker") // optional tag to identify it
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "gmail_sync_worker",
-            ExistingPeriodicWorkPolicy.KEEP, // keep existing if already scheduled
-            workRequest
-        )
-
-
-       /* val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
-            1, TimeUnit.DAYS
-        ).build()
-
-        WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(
-                "cleanup_old_expenses",
-                ExistingPeriodicWorkPolicy.KEEP,
-                cleanupRequest
-            )
-*/
-
-    }
-    LaunchedEffect (Unit){
-        scheduleWorkManager()
     }
 
     LaunchedEffect(Unit) {
@@ -177,8 +148,10 @@ fun ExpenseTrackerScreen(
     }
 
 
-    fun handleSignInWithGoogleOption( context: Context,
-                                      result: GetCredentialResponse) {
+    fun handleSignInWithGoogleOption(
+        context: Context,
+        result: GetCredentialResponse
+    ) {
         // Handle the successfully returned credential.
         val credential = result.credential
 
@@ -191,11 +164,12 @@ fun ExpenseTrackerScreen(
                         val googleIdTokenCredential = GoogleIdTokenCredential
                             .createFrom(credential.data)
 
-                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE).edit {
-                            putString(EMAIL_PREFS, googleIdTokenCredential.id)
-                        }
+                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
+                            .edit {
+                                putString(EMAIL_PREFS, googleIdTokenCredential.id)
+                            }
 
-                      //  viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                        //  viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
                         viewModel.fetchGmailData(context)
                     } catch (e: GoogleIdTokenParsingException) {
                         Log.e(TAG, "Received an invalid google id token response", e)
@@ -245,10 +219,11 @@ fun ExpenseTrackerScreen(
                         val googleIdTokenCredential = GoogleIdTokenCredential
                             .createFrom(credential.data)
 
-                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE).edit {
-                            putString(EMAIL_PREFS, googleIdTokenCredential.id)
-                        }
-                       // viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
+                        context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
+                            .edit {
+                                putString(EMAIL_PREFS, googleIdTokenCredential.id)
+                            }
+                        // viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
                         viewModel.fetchGmailData(context)
                     } catch (e: GoogleIdTokenParsingException) {
                         Log.e(TAG, "Received an invalid google id token response", e)
@@ -267,7 +242,7 @@ fun ExpenseTrackerScreen(
     }
 
 
-     fun createGoogleSignIn() {
+    fun createGoogleSignIn() {
         val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(true)
             .setServerClientId(BuildConfig.WEB_CLIENT_ID)
@@ -329,15 +304,21 @@ fun ExpenseTrackerScreen(
 
     }
 
+    val isFirstSignIn = remember {
+        sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)
+    }
+
 
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Expense Tracker") },
+            TopAppBar(
+                title = { Text("Expense Tracker") },
                 colors = topAppBarColors(
-                containerColor = PrimaryBlue,
-                titleContentColor = Color.White,
-            ))
+                    containerColor = PrimaryBlue,
+                    titleContentColor = Color.White,
+                )
+            )
         }
     ) { paddingValues ->
         LazyColumn(
@@ -348,27 +329,42 @@ fun ExpenseTrackerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-           /* item {
-                Button(onClick = { viewModel.scanSmsForExpenses() }) {
-                    Text("Scan SMS for Expenses")
+            /* item {
+                 Button(onClick = { viewModel.scanSmsForExpenses() }) {
+                     Text("Scan SMS for Expenses")
+                 }
+             }*/
+
+            if (isFirstSignIn) {
+                item {
+                    GoogleSignInButtonCompose({
+                        createGoogleSignInWithButton()
+                        sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
+                    })
                 }
-            }*/
+            } else {
+                item {
+                    LaunchedEffect(Unit) {
+                        viewModel.firstTimeSignInOccurred {
+                            createGoogleSignIn()
+                        }
+                    }
+                }
 
-            item {
-                GoogleSignInButtonCompose( {
-                   if(sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)){
-                       createGoogleSignInWithButton()
-                       sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
-                   } else {
-                       createGoogleSignIn()
-
-                   }
-                })
             }
+
+
+
 
             if (state.isLoading) {
                 item {
-                    CircularProgressIndicator()
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxSize(), // takes full available space in LazyColumn
+                        contentAlignment = Alignment.Center // centers content both horizontally & vertically
+                    ) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
 
@@ -378,7 +374,7 @@ fun ExpenseTrackerScreen(
                 }
             }
 
-            if(state.nativeChart.isNotEmpty()){
+            if (state.nativeChart.isNotEmpty()) {
                 item {
                     Text("Expense Categories Chart:", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -389,7 +385,7 @@ fun ExpenseTrackerScreen(
 
             if (state.expenses.isNotEmpty()) {
                 item {
-                    Button( onClick = {navController.navigate(Screen.ExpenseDetails.route)}) {
+                    Button(onClick = { navController.navigate(Screen.ExpenseDetails.route) }) {
                         Text("View Expenses")
                     }
                 }
@@ -443,6 +439,19 @@ fun ExpenseTrackerScreen(
                         }
                     }
 
+                }
+            }
+
+            if (state.isRecommendationLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillParentMaxHeight(0.3f), // take half of the remaining screen height
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedRecommendationLoaderM3()
+                    }
                 }
             }
         }

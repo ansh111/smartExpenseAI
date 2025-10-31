@@ -63,6 +63,7 @@ class ExpenseTrackerViewModel @Inject constructor(
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
         container(ExpenseTrackerState())
 
+    private var isSignInOccurred = false
     companion object {
         const val LAST_SYNC_TIME = "last_sync_time"
         const val TAG = "ExpenseTrackerViewModel"
@@ -81,6 +82,16 @@ class ExpenseTrackerViewModel @Inject constructor(
             reduce { state.copy(errorMessage = "SMS permission denied. Cannot scan expenses.") }
             postSideEffect(ExpenseTrackerSideEffect.ShowToast("SMS permission denied."))
         }
+    }
+
+    /**
+     * Function to rescrit calling GoogleSignIn more than once in view model lifecycle
+     */
+    internal fun firstTimeSignInOccurred(action:() -> Unit) {
+         if(!isSignInOccurred){
+             isSignInOccurred = true
+             action()
+         }
     }
 
     fun scanSmsForExpenses() = intent {
@@ -214,9 +225,13 @@ class ExpenseTrackerViewModel @Inject constructor(
 
 
         if (refinedExpenses.isNotEmpty()) {
+            reduce {
+                state.copy(isRecommendationLoading = true)
+            }
             val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
             reduce {
                 state.copy(
+                    isRecommendationLoading = false,
                     recommendation = recommendations
                 )
             }

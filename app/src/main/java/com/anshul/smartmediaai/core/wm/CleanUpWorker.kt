@@ -1,13 +1,20 @@
 package com.anshul.smartmediaai.core.wm
 
 import android.content.Context
+import android.util.Log
+import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.anshul.smartmediaai.data.repository.ExpenseRepo
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import javax.inject.Inject
 
-
-class CleanUpWorker @Inject constructor(private val context: Context, params: WorkerParameters, private val expenseRepo: ExpenseRepo
+@HiltWorker
+class CleanUpWorker @AssistedInject constructor(
+    @Assisted private val context: Context,
+    @Assisted params: WorkerParameters,
+    private val expenseRepo: ExpenseRepo
 ) : CoroutineWorker(context, params) {
 
 

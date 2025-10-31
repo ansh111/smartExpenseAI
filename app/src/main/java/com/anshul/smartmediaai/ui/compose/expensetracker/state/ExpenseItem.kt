@@ -20,7 +20,8 @@ data class ExpenseTrackerState(
     val nativeChart: Map<String, Double> = emptyMap(),
     val isGmailConsentNeeded: Boolean = false,
     val gmailConsentIntent: Intent? = null,
-    val gmailMessagesId: List<MessagesItem> = emptyList()
+    val gmailMessagesId: List<MessagesItem> = emptyList(),
+    val isRecommendationLoading : Boolean = false
 )
 
 sealed class ExpenseTrackerSideEffect {

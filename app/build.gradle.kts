@@ -102,6 +102,7 @@ dependencies {
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk7")
         exclude("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
     }
+    implementation(libs.androidx.hilt.work)
     implementation (libs.play.services.location)
     implementation(libs.play.services.auth.base)
     kapt(libs.hilt.compiler)
