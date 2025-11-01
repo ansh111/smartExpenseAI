@@ -47,6 +47,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlin.time.measureTime
 
 
 @HiltViewModel
@@ -138,77 +139,90 @@ class ExpenseTrackerViewModel @Inject constructor(
     }
 
     @SuppressLint("SuspiciousIndentation")
-   suspend fun analyseExpenseData(messages : List<String>) : List<ExpenseItem> {
+    suspend fun analyseExpenseData(messages: List<String>): List<ExpenseItem> = coroutineScope {
         val tempExpenses = mutableListOf<ExpenseItem>()
+
         try {
-            Log.d("ThreadCheck", "loadUserData() on thread: ${Thread.currentThread().name}")
-                val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                    .generativeModel("gemini-2.5-pro") // Or your preferred model
-                val batchSize = 10
-                for ((index, batch) in messages.chunked(batchSize).withIndex()) {
+            Log.d("ThreadCheck", "analyseExpenseData() running on: ${Thread.currentThread().name}")
 
-                    val prompt = """
-                    Extract expense details from each of these SMS messages.
-                    For each SMS, identify the merchant, amount, date, and categorize the expense (e.g., Food, Shopping, Bills, Travel, Other).
-                    If you cannot determine a value, use "N/A".
-                    Return the output as a JSON array of objects. Each object should have keys:
-                    "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
-            
-                    SMS messages:
-                    ${batch.joinToString("\n\n")}
-                """.trimIndent()
+            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
+                .generativeModel("gemini-2.5-pro")
 
-                    val requestContent = content { text(prompt) }
-                    val response =
-                        generativeModel.generateContent(requestContent) // Or generateContentStream
+            val batchSize = 10
+            val batches = messages.chunked(batchSize)
 
-                    response.text?.let { jsonResponse ->
-                        // TODO: Parse the JSON response from Gemini into your ExpenseItem data class
-                        // You might need a JSON parsing library like kotlinx.serialization or Gson
-                        // For simplicity, this is a placeholder
-                        try {
-                            // Example (very basic, needs proper JSON parsing and error handling):
+            // Limit concurrency to 3 parallel Gemini API requests
+            val dispatcher = Dispatchers.IO.limitedParallelism(3)
+
+            // Process all batches concurrently
+            val deferredResults = batches.mapIndexed { index, batch ->
+                async(dispatcher) {
+                    try {
+                        val prompt = """
+                        Extract expense details from each of these SMS messages.
+                        For each SMS, identify the merchant, amount, date, and categorize the expense 
+                        (e.g., Food, Shopping, Bills, Travel, Other).
+                        If you cannot determine a value, use "N/A".
+                        Return the output as a JSON array of objects. 
+                        Each object should have keys:
+                        "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
+                        
+                        SMS messages:
+                        ${batch.joinToString("\n\n")}
+                    """.trimIndent()
+
+                        val requestContent = content { text(prompt) }
+                        val response = generativeModel.generateContent(requestContent)
+
+                        response.text?.let { jsonResponse ->
                             val finalJson = jsonResponse.replace(Regex("```json|```"), "").trim()
-                            // Parse the batch as a list of ExpenseItem
                             val parsedExpenses: List<ExpenseItem> = gson.fromJson(
                                 finalJson,
                                 object : TypeToken<List<ExpenseItem>>() {}.type
                             )
-                            tempExpenses.addAll(parsedExpenses)
-                            println("Batch ${index + 1} processed: $finalJson")
-                            // println("AI Response for SMS '$sms': $jsonResponse") // Log for debugging
-                        } catch (e: Exception) {
-                            println("Error parsing AI response: ${e.message}")
-                        }
+                            println("Batch ${index + 1} processed successfully (${parsedExpenses.size} items)")
+                            parsedExpenses
+                        } ?: emptyList()
+                    } catch (e: Exception) {
+                        println("Error in batch ${index + 1}: ${e.message}")
+                        emptyList<ExpenseItem>()
+                    }
+                }
+            }
+
+            // Wait for all concurrent Gemini calls
+            val allExpenses = deferredResults.awaitAll().flatten()
+
+            // Safely update DB and preferences on IO dispatcher
+            withContext(Dispatchers.IO) {
+                if (allExpenses.isNotEmpty()) {
+                    val expenseEntities = allExpenses.map { item ->
+                        ExpenseEntity(
+                            description = item.merchant,
+                            amount = item.amount,
+                            date = item.date,
+                            category = item.category,
+                            messageId = item.messageId
+                        )
                     }
 
-                val expenseEntities = tempExpenses.map { item ->
-                    ExpenseEntity(
-                        description = item.merchant,
-                        amount = item.amount,
-                        date = item.date,
-                        category = item.category,
-                        messageId = item.messageId
-                    )
+                    repo.insertAllExpenses(expenseEntities)
+                    preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
 
+                    println("💾 Saved ${expenseEntities.size} expenses to DB")
                 }
-                repo.insertAllExpenses(expenseEntities)
-                preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
-
             }
+
+            tempExpenses.addAll(allExpenses)
 
         } catch (e: Exception) {
             e.printStackTrace()
-          /*  reduce {
-                state.copy(
-                    isLoading = false,
-                    errorMessage = e.message ?: "Error processing SMS"
-                )
-            }
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))*/
+            println("❌ analyseExpenseData failed: ${e.message}")
         }
-        return tempExpenses
+
+        return@coroutineScope tempExpenses
     }
+
 
     fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>) =  intent{
 
@@ -237,7 +251,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             }
             postSideEffect(ExpenseTrackerSideEffect.ShowToast("Expenses extracted.Recommendations ready"))
         } else {
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Could not extract details from SMS."))
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Could not extract details from provided data may be its empty."))
         }
 
     }
@@ -401,7 +415,14 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val token = GoogleAuthUtil.getToken(context, email, GMAIL_SCOPE)
                 Log.d(TAG, "Access Token: $token")
                 val bearerToken = "Bearer $token"
-                val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
+                val q = """
+category:updates
+(subject:debit OR subject:transaction OR from:noreply@hdfcbank.com)
+("has been debited" OR "withdrawn from account")
+-SIP -EMI -AutoPay -mutual -insurance
+newer_than:30d
+""".trimIndent()
+                val response = repo.readEmails(bearerToken, q)
                 val allDecodedTexts = coroutineScope {
                     response.messages
                         ?.distinctBy { it.threadId } // avoid duplicate calls
@@ -425,9 +446,10 @@ class ExpenseTrackerViewModel @Inject constructor(
                         }?.awaitAll()?.flatten()
                 } ?: emptyList()
                 Log.d("Anshul", "Fetched ${allDecodedTexts.size} messages")
-
-                val expenseList = analyseExpenseData(allDecodedTexts)
-                buildRefinedExpenseData(expenseList)
+                val timeTaken = measureTime {
+                    val expenseList = analyseExpenseData(allDecodedTexts)
+                    buildRefinedExpenseData(expenseList)
+                }
             } catch (e: UserRecoverableAuthException) {
                 Log.w(TAG, "Need user consent to access Gmail", e)
                 // Launch consent screen on main thread

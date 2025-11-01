@@ -26,28 +26,36 @@ import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlin.time.measureTime
 
-class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): GmailRepo {
-    override suspend fun readMails(context: Context, lastSyncTimestamp: Long): List<ExpenseItem> = withContext(Dispatchers.IO) {
+class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) : GmailRepo {
+
+    data class ExpenseResult(val result: List<ExpenseItem>, val time: String)
+
+    override suspend fun readMails(context: Context, lastSyncTimestamp: Long): List<ExpenseItem> =
+        withContext(Dispatchers.IO) {
             val sp = context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
 
-            val token = GoogleAuthUtil.getToken(context,
-                sp.getString(EMAIL_PREFS,"").toString(), GMAIL_SCOPE)
+            val token = GoogleAuthUtil.getToken(
+                context,
+                sp.getString(EMAIL_PREFS, "").toString(), GMAIL_SCOPE
+            )
             Log.d(TAG, "Access Token: $token")
             val bearerToken = "Bearer $token"
-        val response = if (lastSyncTimestamp == 0L) {
-            repo.readEmails(
-                bearerToken,
-                "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d"
-            )
-        } else {
-            repo.readEmails(
-                bearerToken,
-                "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance after:${lastSyncTimestamp/1000} before:${System.currentTimeMillis()/1000}"
-            )
-        }
-           // val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
+            val response = if (lastSyncTimestamp == 0L) {
+                repo.readEmails(
+                    bearerToken,
+                    "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d"
+                )
+            } else {
+                repo.readEmails(
+                    bearerToken,
+                    "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance after:${lastSyncTimestamp / 1000} before:${System.currentTimeMillis() / 1000}"
+                )
+            }
+            // val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
             val allDecodedTexts: List<DecodeMessages> = withContext(Dispatchers.Default) {
                 response.messages
                     ?.distinctBy { it.threadId } // avoid duplicate calls
@@ -61,9 +69,13 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                                     listOf(
                                         DecodeMessages(
                                             messageId = payload.id,
-                                            message = extractPlainTextFromHtml(decodeString(payloadParts.body.data))
+                                            message = extractPlainTextFromHtml(
+                                                decodeString(
+                                                    payloadParts.body.data
+                                                )
+                                            )
                                         )
-                                      //  extractPlainTextFromHtml(decodeString(payloadParts.body.data))
+                                        //  extractPlainTextFromHtml(decodeString(payloadParts.body.data))
                                     )
                                 } else {
                                     payloadParts.parts.map {
@@ -71,7 +83,7 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                                             messageId = payload.id,
                                             message = extractPlainTextFromHtml(decodeString(it.body.data))
                                         )
-                                      //  extractPlainTextFromHtml(decodeString(it.body.data))
+                                        //  extractPlainTextFromHtml(decodeString(it.body.data))
                                     }
                                 }
                             } ?: emptyList<DecodeMessages>()
@@ -79,20 +91,41 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
                     }?.awaitAll()?.flatten()
             } ?: emptyList()
             Log.d("Anshul", "Fetched ${allDecodedTexts.size} messages")
-        val refinedExpenses  = analyseExpenseData(allDecodedTexts,sp)
-        return@withContext refinedExpenses
-    }
+
+            val refinedExpenses = analyseExpenseData1(allDecodedTexts, sp)
+            Log.d("AnshulNigam", refinedExpenses.time)
+            return@withContext refinedExpenses.result
+        }
+
 
     @SuppressLint("SuspiciousIndentation")
-    suspend fun analyseExpenseData(messages: List<DecodeMessages>, sp: SharedPreferences): List<ExpenseItem> {
+    suspend fun analyseExpenseData1(
+        messages: List<DecodeMessages>,
+        sp: SharedPreferences
+    ): ExpenseResult = coroutineScope {
         val tempExpenses = mutableListOf<ExpenseItem>()
-        try {
-            Log.d("ThreadCheck", "loadUserData() on thread: ${Thread.currentThread().name}")
-            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                .generativeModel("gemini-2.5-pro") // Or your preferred model
-            val batchSize = 10
-            for ((index, batch) in messages.chunked(batchSize).withIndex()) {
-                val prompt = """
+        val time = measureTime {
+
+            try {
+                Log.d(
+                    "ThreadCheck",
+                    "analyseExpenseData() running on: ${Thread.currentThread().name}"
+                )
+
+                val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
+                    .generativeModel("gemini-2.5-pro")
+
+                val batchSize = 10
+                val batches = messages.chunked(batchSize)
+
+                // Limit concurrency to 3 parallel Gemini API requests
+                val dispatcher = Dispatchers.IO.limitedParallelism(3)
+
+                // Process all batches concurrently
+                val deferredResults = batches.mapIndexed { index, batch ->
+                    async(dispatcher) {
+                        try {
+                            val prompt = """
             You are a data extraction assistant.
             Extract expense details from each message below.
             For each message, read its "text" and use the provided "messageId" to return consistent results.
@@ -111,68 +144,69 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson): 
             Messages:
             [
             ${batch.joinToString(",\n") { msg ->
-                                """{"messageId": "${msg.messageId}", "text": "${msg.message.replace("\"", "\\\"")}"}"""
-                            }}
+                                    """{"messageId": "${msg.messageId}", "text": "${
+                                        msg.message.replace(
+                                            "\"",
+                                            "\\\""
+                                        )
+                                    }"}"""
+                                }
+                            }
             ]
             """.trimIndent()
 
+                                val requestContent = content { text(prompt) }
+                                val response = generativeModel.generateContent(requestContent)
 
-                val requestContent = content { text(prompt) }
-                val response =
-                    generativeModel.generateContent(requestContent) // Or generateContentStream
-
-                response.text?.let { jsonResponse ->
-                    // TODO: Parse the JSON response from Gemini into your ExpenseItem data class
-                    // You might need a JSON parsing library like kotlinx.serialization or Gson
-                    // For simplicity, this is a placeholder
-                    try {
-                        // Example (very basic, needs proper JSON parsing and error handling):
-                        val finalJson = jsonResponse.replace(Regex("```json|```"), "").trim()
-                        // Parse the batch as a list of ExpenseItem
-                        val parsedExpenses: List<ExpenseItem> = gson.fromJson(
-                            finalJson,
-                            object : TypeToken<List<ExpenseItem>>() {}.type
-                        )
-                        tempExpenses.addAll(parsedExpenses)
-                        println("Batch ${index + 1} processed: $finalJson")
-                        // println("AI Response for SMS '$sms': $jsonResponse") // Log for debugging
-                    } catch (e: Exception) {
-                        println("Error parsing AI response: ${e.message}")
+                                response.text?.let { jsonResponse ->
+                                    val finalJson =
+                                        jsonResponse.replace(Regex("```json|```"), "").trim()
+                                    val parsedExpenses: List<ExpenseItem> = gson.fromJson(
+                                        finalJson,
+                                        object : TypeToken<List<ExpenseItem>>() {}.type
+                                    )
+                                    println("Batch ${index + 1} processed successfully (${parsedExpenses.size} items)")
+                                    parsedExpenses
+                                } ?: emptyList()
+                            } catch (e: Exception) {
+                                println("Error in batch ${index + 1}: ${e.message}")
+                                emptyList<ExpenseItem>()
+                            }
                     }
                 }
 
+                // Wait for all concurrent Gemini calls
+                val allExpenses = deferredResults.awaitAll().flatten()
 
+                // Safely update DB and preferences on IO dispatcher
+                withContext(Dispatchers.IO) {
+                    if (allExpenses.isNotEmpty()) {
+                        val expenseEntities = allExpenses.map { item ->
+                            ExpenseEntity(
+                                description = item.merchant,
+                                amount = item.amount,
+                                date = item.date,
+                                category = item.category,
+                                messageId = item.messageId
+                            )
+                        }
 
+                        repo.insertAllExpenses(expenseEntities)
+                        sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+
+                        println("Saved ${expenseEntities.size} expenses to DB")
+                    }
+                }
+
+                tempExpenses.addAll(allExpenses)
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                println("analyseExpenseData failed: ${e.message}")
             }
-
-            val expenseEntities = tempExpenses.map { item ->
-                ExpenseEntity(
-                    description = item.merchant,
-                    amount = item.amount,
-                    date = item.date,
-                    category = item.category,
-                    messageId = item.messageId
-
-                )
-
-            }
-            if(tempExpenses.isNotEmpty()) {
-                repo.insertAllExpenses(expenseEntities)
-                sp.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
-            }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-            /*  reduce {
-                  state.copy(
-                      isLoading = false,
-                      errorMessage = e.message ?: "Error processing SMS"
-                  )
-              }
-              postSideEffect(ExpenseTrackerSideEffect.ShowToast(e.message ?: "Unknown error"))*/
         }
 
-        return tempExpenses
+        return@coroutineScope ExpenseResult(tempExpenses, time.toString())
     }
 
 
