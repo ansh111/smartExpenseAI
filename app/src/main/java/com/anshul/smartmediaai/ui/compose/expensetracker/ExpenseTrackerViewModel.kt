@@ -138,6 +138,9 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Not removing this since it is used for sms scanning will first make it generic then remove
+     */
     @SuppressLint("SuspiciousIndentation")
     suspend fun analyseExpenseData(messages: List<String>): List<ExpenseItem> = coroutineScope {
         val tempExpenses = mutableListOf<ExpenseItem>()
@@ -217,7 +220,7 @@ class ExpenseTrackerViewModel @Inject constructor(
 
         } catch (e: Exception) {
             e.printStackTrace()
-            println("❌ analyseExpenseData failed: ${e.message}")
+            println("analyseExpenseData failed: ${e.message}")
         }
 
         return@coroutineScope tempExpenses
@@ -416,9 +419,10 @@ class ExpenseTrackerViewModel @Inject constructor(
                 Log.d(TAG, "Access Token: $token")
                 val bearerToken = "Bearer $token"
                 val q = """
-category:updates
+                    (\"debited from account\" OR \"withdrawn from account\") OR
+(category:updates
 (subject:debit OR subject:transaction OR from:noreply@hdfcbank.com)
-("has been debited" OR "withdrawn from account")
+("has been debited" OR "withdrawn from account"))
 -SIP -EMI -AutoPay -mutual -insurance
 newer_than:30d
 """.trimIndent()

@@ -45,14 +45,30 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) :
             Log.d(TAG, "Access Token: $token")
             val bearerToken = "Bearer $token"
             val response = if (lastSyncTimestamp == 0L) {
+                val q = """
+                    (\"debited from account\" OR \"withdrawn from account\") OR
+(category:updates
+(subject:debit OR subject:transaction)
+(\"has been debited\" OR \"withdrawn from account\"))
+-SIP -EMI -AutoPay -mutual -insurance
+newer_than:30d
+""".trimIndent()
                 repo.readEmails(
                     bearerToken,
-                    "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d"
+                    q
                 )
             } else {
+                val q = """
+                   (\"debited from account\" OR \"withdrawn from account\") OR
+(category:updates
+(subject:debit OR subject:transaction)
+(\"has been debited\" OR \"withdrawn from account\"))
+-SIP -EMI -AutoPay -mutual -insurance
+                after:${lastSyncTimestamp / 1000} before:${System.currentTimeMillis() / 1000}
+                """.trimIndent()
                 repo.readEmails(
                     bearerToken,
-                    "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance after:${lastSyncTimestamp / 1000} before:${System.currentTimeMillis() / 1000}"
+                    q
                 )
             }
             // val response = repo.readEmails(bearerToken, "(\"debited from account\" OR \"withdrawn from account\") -SIP -EMI -AutoPay -mutual -insurance newer_than:30d")
@@ -143,7 +159,8 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) :
             
             Messages:
             [
-            ${batch.joinToString(",\n") { msg ->
+            ${
+                                batch.joinToString(",\n") { msg ->
                                     """{"messageId": "${msg.messageId}", "text": "${
                                         msg.message.replace(
                                             "\"",
@@ -155,23 +172,23 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) :
             ]
             """.trimIndent()
 
-                                val requestContent = content { text(prompt) }
-                                val response = generativeModel.generateContent(requestContent)
+                            val requestContent = content { text(prompt) }
+                            val response = generativeModel.generateContent(requestContent)
 
-                                response.text?.let { jsonResponse ->
-                                    val finalJson =
-                                        jsonResponse.replace(Regex("```json|```"), "").trim()
-                                    val parsedExpenses: List<ExpenseItem> = gson.fromJson(
-                                        finalJson,
-                                        object : TypeToken<List<ExpenseItem>>() {}.type
-                                    )
-                                    println("Batch ${index + 1} processed successfully (${parsedExpenses.size} items)")
-                                    parsedExpenses
-                                } ?: emptyList()
-                            } catch (e: Exception) {
-                                println("Error in batch ${index + 1}: ${e.message}")
-                                emptyList<ExpenseItem>()
-                            }
+                            response.text?.let { jsonResponse ->
+                                val finalJson =
+                                    jsonResponse.replace(Regex("```json|```"), "").trim()
+                                val parsedExpenses: List<ExpenseItem> = gson.fromJson(
+                                    finalJson,
+                                    object : TypeToken<List<ExpenseItem>>() {}.type
+                                )
+                                println("Batch ${index + 1} processed successfully (${parsedExpenses.size} items)")
+                                parsedExpenses
+                            } ?: emptyList()
+                        } catch (e: Exception) {
+                            println("Error in batch ${index + 1}: ${e.message}")
+                            emptyList<ExpenseItem>()
+                        }
                     }
                 }
 

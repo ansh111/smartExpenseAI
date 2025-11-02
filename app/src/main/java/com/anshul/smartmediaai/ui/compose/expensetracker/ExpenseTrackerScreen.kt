@@ -128,8 +128,7 @@ fun ExpenseTrackerScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.fetchGmailAccessToken(context, "")
-
+            viewModel.fetchGmailData(context)
         } else {
             Toast.makeText(context, "Google Sign-in failed for user", Toast.LENGTH_SHORT).show()
         }
@@ -168,8 +167,6 @@ fun ExpenseTrackerScreen(
                             .edit {
                                 putString(EMAIL_PREFS, googleIdTokenCredential.id)
                             }
-
-                        //  viewModel.fetchGmailAccessToken(context, googleIdTokenCredential.id)
                         viewModel.fetchGmailData(context)
                     } catch (e: GoogleIdTokenParsingException) {
                         Log.e(TAG, "Received an invalid google id token response", e)
