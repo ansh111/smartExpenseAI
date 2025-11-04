@@ -14,10 +14,11 @@ import javax.inject.Inject
 class CleanUpWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
-    private val expenseRepo: ExpenseRepo
 ) : CoroutineWorker(context, params) {
 
 
+    @Inject
+    lateinit var expenseRepo: ExpenseRepo
     override suspend fun doWork(): Result {
         try {
             expenseRepo.delete30DaysOldExpenses()

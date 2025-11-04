@@ -1,6 +1,7 @@
 package com.anshul.smartmediaai
 
 import android.app.Application
+import android.util.Log.VERBOSE
 import android.webkit.WebView
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
@@ -29,6 +30,7 @@ class SmartMediaAIApplication : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(VERBOSE)
             .build()
 
 
@@ -48,7 +50,7 @@ class SmartMediaAIApplication : Application(), Configuration.Provider {
         )
 
 
-      /*  val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
+        val cleanupRequest = PeriodicWorkRequestBuilder<CleanUpWorker>(
             1, TimeUnit.DAYS
         ).build()
 
@@ -57,7 +59,7 @@ class SmartMediaAIApplication : Application(), Configuration.Provider {
                 "cleanup_old_expenses",
                 ExistingPeriodicWorkPolicy.KEEP,
                 cleanupRequest
-            )*/
+            )
 
     }
 }

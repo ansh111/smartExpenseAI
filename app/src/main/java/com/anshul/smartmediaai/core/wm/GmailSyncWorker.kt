@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.anshul.smartmediaai.data.repository.ExpenseRepo
 import com.anshul.smartmediaai.data.repository.GmailRepo
 import com.anshul.smartmediaai.ui.compose.expensetracker.ExpenseTrackerViewModel.Companion.LAST_SYNC_TIME
 import com.anshul.smartmediaai.util.constants.ExpenseConstant.EXPENSE_SHARED_PREFS
@@ -14,7 +15,10 @@ import javax.inject.Inject
 @HiltWorker
 class GmailSyncWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
-    @Assisted workerParameters: WorkerParameters, val repo: GmailRepo ): CoroutineWorker(appContext,workerParameters) {
+    @Assisted workerParameters: WorkerParameters ): CoroutineWorker(appContext,workerParameters) {
+
+    @Inject
+    lateinit var repo: GmailRepo
 
     override suspend fun doWork(): Result {
        try{
