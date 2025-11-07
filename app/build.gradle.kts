@@ -22,6 +22,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            // Use gradle.properties for secure storage
+            storeFile = file(project.findProperty("RELEASE_STORE_FILE") ?: "")
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String? ?: ""
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String? ?: ""
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String? ?: ""
+        }
+    }
+
+
+
 
     buildTypes {
         debug {
@@ -31,6 +43,8 @@ android {
         }
         release {
             isMinifyEnabled = true
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "GEMINI_API_KEY", "\"${project.findProperty("GEMINI_API_KEY") ?: ""}\"")
             buildConfigField("String", "GOOGLE_API_KEY", "\"${project.findProperty("GOOGLE_API_KEY") ?: ""}\"")
             buildConfigField("String","WEB_CLIENT_ID","\"${project.findProperty("WEB_CLIENT_ID") ?: ""}\"")

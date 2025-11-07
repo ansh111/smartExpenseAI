@@ -76,6 +76,13 @@
 -keep class com.google.android.gms.measurement.** { *; }
 -keepattributes *Annotation*
 
+# Firebase Analytics / Google Play Measurement
+-keep class com.google.android.gms.internal.measurement.** { *; }
+
+# Prevent removing generic type info
+-keepattributes Signature
+
+
 # --- Google Sign-In & Credentials Manager (Google ID) ---
 # Keep model classes used by the Google Identity services.
 -keep class com.google.android.gms.auth.** { *; }
@@ -114,3 +121,19 @@
 -keepclassmembers class **.R$* {
     <fields>;
 }
+
+-keepattributes Signature, InnerClasses, EnclosingMethod
+
+# Keep Guava reflection classes
+-keep class com.google.common.reflect.** { *; }
+-keepclassmembers class com.google.common.reflect.** { *; }
+
+# Keep Gson/Retrofit models if applicable
+-keep class retrofit2.** { *; }
+
+-keep class com.google.api.** { *; }
+-keep class com.google.cloud.aiplatform.** { *; }
+
+-keep class com.google.common.reflect.TypeToken { *; }
+-keep class * extends com.google.common.reflect.TypeToken
+

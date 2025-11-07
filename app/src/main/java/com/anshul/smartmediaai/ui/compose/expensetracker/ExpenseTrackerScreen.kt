@@ -239,36 +239,6 @@ fun ExpenseTrackerScreen(
     }
 
 
-    fun createGoogleSignIn() {
-        val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(true)
-            .setServerClientId(BuildConfig.WEB_CLIENT_ID)
-            .setAutoSelectEnabled(true)
-            // nonce string to use when generating a Google ID token
-            .build()
-
-        val credentialManager = CredentialManager.create(context)
-
-        val request: GetCredentialRequest = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
-            .build()
-
-        coroutineScope.launch {
-            coroutineScope {
-                try {
-                    val result = credentialManager.getCredential(
-                        request = request,
-                        context = context,
-                    )
-                    handleSignIn(result)
-                } catch (e: GetCredentialException) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-    }
-
     fun createGoogleSignInWithButton() {
 
         val activity = context as? Activity ?: return
@@ -300,6 +270,40 @@ fun ExpenseTrackerScreen(
         }
 
     }
+
+
+
+    fun createGoogleSignIn() {
+        val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(true)
+            .setServerClientId(BuildConfig.WEB_CLIENT_ID)
+            .setAutoSelectEnabled(true)
+            // nonce string to use when generating a Google ID token
+            .build()
+
+        val credentialManager = CredentialManager.create(context)
+
+        val request: GetCredentialRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        coroutineScope.launch {
+            coroutineScope {
+                try {
+                    val result = credentialManager.getCredential(
+                        request = request,
+                        context = context,
+                    )
+                    handleSignIn(result)
+                } catch (e: GetCredentialException) {
+                    createGoogleSignInWithButton()
+                    e.printStackTrace()
+                }
+            }
+        }
+
+    }
+
 
     val isFirstSignIn = remember {
         sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)
@@ -337,6 +341,7 @@ fun ExpenseTrackerScreen(
                     GoogleSignInButtonCompose({
                         createGoogleSignInWithButton()
                         sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
+                        viewModel.setIsFirstTimeSignInFromGoogleButton(true)
                     })
                 }
             } else {

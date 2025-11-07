@@ -19,6 +19,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SmartMediaAI"
         tools:targetApi="31">
+
+        <meta-data
+            android:name="androidx.work.WorkManagerInitializer"
+            tools:node="remove" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

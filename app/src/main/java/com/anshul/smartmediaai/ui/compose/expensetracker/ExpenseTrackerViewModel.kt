@@ -40,9 +40,11 @@ import androidx.core.content.edit
 import com.anshul.smartmediaai.data.repository.GmailRepo
 import com.anshul.smartmediaai.util.HelperFunctions.decodeString
 import com.anshul.smartmediaai.util.HelperFunctions.extractPlainTextFromHtml
+import com.anshul.smartmediaai.util.HelperFunctions.useExponentialBackoffRetry
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
+import com.google.firebase.ai.type.FirebaseAIException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -93,6 +95,10 @@ class ExpenseTrackerViewModel @Inject constructor(
              isSignInOccurred = true
              action()
          }
+    }
+
+    internal fun setIsFirstTimeSignInFromGoogleButton(isFirstSignIn: Boolean){
+        isSignInOccurred = isFirstSignIn
     }
 
     fun scanSmsForExpenses() = intent {
@@ -245,7 +251,14 @@ class ExpenseTrackerViewModel @Inject constructor(
             reduce {
                 state.copy(isRecommendationLoading = true)
             }
-            val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
+            val recommendations = useExponentialBackoffRetry (
+                shouldRetry = { e ->
+                    e is FirebaseAIException && e.message?.contains("Resource exhausted") == true
+                }
+            ) {
+                analyzeExpensesAndRecommend(refinedExpenses)
+            }
+           // val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
             reduce {
                 state.copy(
                     isRecommendationLoading = false,
@@ -307,7 +320,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                 return@withContext response.text
             } catch (e: Exception) {
                 e.printStackTrace()
-                return@withContext null
+                throw e
             }
         }
     }
