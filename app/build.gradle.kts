@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-    namespace = "com.anshul.smartmediaai"
+    namespace = "com.anshul.expenseai"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.anshul.smartmediaai"
+        applicationId = "com.anshul.expenseai"
         minSdk = 28
         targetSdk = 35
         versionCode = 1

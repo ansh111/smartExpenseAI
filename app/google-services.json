@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "755076631623",
-    "project_id": "expenseanalyserai",
-    "storage_bucket": "expenseanalyserai.firebasestorage.app"
+    "project_number": "273909594285",
+    "project_id": "expenseai-b9790",
+    "storage_bucket": "expenseai-b9790.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:755076631623:android:c9abe08df02c8d1c2bf562",
+        "mobilesdk_app_id": "1:273909594285:android:2de17938b3e9bfc6f3ae24",
         "android_client_info": {
-          "package_name": "com.anshul.smartmediaai"
+          "package_name": "com.anshul.expenseai"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "273909594285-p44jm10q2ijmrtu2tf3mhce43u65oiq9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anshul.expenseai",
+            "certificate_hash": "64f3d7ca6307489f0efd85aafb25de12aeca792e"
+          }
+        },
+        {
+          "client_id": "273909594285-gsm4pqk6o6ge6psan29u30qtfptti3m3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyCzNocgsLQFF_0rHSZn6_QKlHMEu7-f314"
+          "current_key": "AIzaSyCHX7TBRd5R9Oqr0k8ggVb87uZM0Qc4AC8"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "273909594285-gsm4pqk6o6ge6psan29u30qtfptti3m3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

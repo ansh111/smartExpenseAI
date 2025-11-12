@@ -45,7 +45,7 @@
 # --- Hilt ---
 # Hilt's Gradle plugin adds most necessary rules, but these are good fallbacks.
 -keep class dagger.hilt.internal.aggregatedroot.codegen.** { *; }
--keep class com.anshul.smartmediaai.Hilt_** { *; } # Replace with your app's package name
+-keep class com.anshul.expenseai.Hilt_** { *; } # Replace with your app's package name
 -keep class hilt_aggregated_deps.** { *; }
 -dontwarn dagger.hilt.**
 -keep class * extends androidx.lifecycle.ViewModel
@@ -53,8 +53,8 @@
 
 # --- Room ---
 # Keep your Entity classes, as Room uses them with reflection.
--keep class com.anshul.smartmediaai.data.entities.** { *; } # Adjust package if needed
--keep class com.anshul.smartmediaai.data.local.db.entity.** { *; } # As used in a previous example
+-keep class com.anshul.expenseai.data.entities.** { *; } # Adjust package if needed
+-keep class com.anshul.expenseai.data.local.db.entity.** { *; } # As used in a previous example
 -keepclassmembers class * extends androidx.room.RoomDatabase {
     public static final androidx.room.RoomDatabase$Callback sCallback;
 }
@@ -62,8 +62,8 @@
 # --- Retrofit & Gson ---
 # Keep data model classes used for serialization/deserialization.
 # Assuming they are in a `model` or `dto` package. Adjust as needed.
--keep class com.anshul.smartmediaai.data.model.** { *; }
--keep class com.anshul.smartmediaai.data.remote.** { *; }
+-keep class com.anshul.expenseai.data.model.** { *; }
+-keep class com.anshul.expenseai.data.remote.** { *; }
 -keep class com.google.gson.** { *; }
 -keepattributes Signature, InnerClasses, *Annotation*
 
@@ -96,7 +96,7 @@
 
 # --- Orbit MVI ---
 # Keep state and side effect classes.
--keep class com.anshul.smartmediaai.ui.compose.expensetracker.state.** { *; } # Keep your State/SideEffect classes
+-keep class com.anshul.expenseai.ui.compose.expensetracker.state.** { *; } # Keep your State/SideEffect classes
 
 # --- Jsoup ---
 # Keep classes from the Jsoup library for HTML parsing.
@@ -107,8 +107,8 @@
 # 3. WorkManager ---
 # Your `GmailSyncWorker` and `CleanUpWorker` must be kept.
 # =================================================================================
--keep public class com.anshul.smartmediaai.core.wm.GmailSyncWorker
--keep public class com.anshul.smartmediaai.core.wm.CleanUpWorker
+-keep public class com.anshul.expenseai.core.wm.GmailSyncWorker
+-keep public class com.anshul.expenseai.core.wm.CleanUpWorker
 
 # =================================================================================
 # 4. Jetpack Compose ---
