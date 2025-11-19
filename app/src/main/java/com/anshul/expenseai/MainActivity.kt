@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
+import com.anshul.expenseai.ui.compose.expensetracker.onboarding.ExpenseTrackerWithOnboardingApp
 import com.anshul.expenseai.ui.nav.ExpenseNavigation
 import com.anshul.expenseai.ui.theme.SmartMediaAITheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,7 +31,7 @@ class MainActivity : ComponentActivity() {
        //createGoogleSignInWithButton()
         enableEdgeToEdge()
         setContent {
-            SmartMediaAITheme {
+            /*SmartMediaAITheme {
                 val navController = rememberNavController()
                 Scaffold(
                     containerColor = MaterialTheme.colorScheme.background
@@ -42,7 +43,8 @@ class MainActivity : ComponentActivity() {
                    // ExpenseTrackerScreen(modifier = Modifier.padding(innerPadding))
                    // VideoSummarisationScreen(modifier = Modifier.padding(innerPadding))
                 }
-            }
+            }*/
+            ExpenseTrackerWithOnboardingApp()
         }
     }
 
