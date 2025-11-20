@@ -24,7 +24,7 @@ fun ExpenseTrackerWithOnboardingApp() {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            if (showOnboarding) {
+            if (false) {
                 OnboardingFlow(
                     onComplete = { showOnboarding = false }
                 )
