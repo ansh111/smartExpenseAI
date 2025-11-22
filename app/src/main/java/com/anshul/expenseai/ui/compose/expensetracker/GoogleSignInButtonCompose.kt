@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.anshul.expenseai.ui.theme.MinimalDarkColors
 
 @Composable
 fun GoogleSignInButtonCompose(onClick: () -> Unit) {

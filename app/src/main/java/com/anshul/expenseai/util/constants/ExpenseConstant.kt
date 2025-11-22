@@ -6,5 +6,6 @@ object ExpenseConstant {
     const val EMAIL_PREFS = "email"
     const val FIRST_GMAIL_SIGN_IN_PREF ="first_gmail_sign_in"
     const val LAST_SYNC_TIME = "last_sync_time"
+    const val SHOW_ONBOARDING = "show_onboarding"
 
 }

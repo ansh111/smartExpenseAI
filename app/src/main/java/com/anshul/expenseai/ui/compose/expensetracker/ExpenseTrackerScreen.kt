@@ -1,6 +1,5 @@
 package com.anshul.expenseai.ui.compose.expensetracker
 
-import AnimatedRecommendationLoaderM3
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -19,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -44,8 +42,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import com.anshul.expenseai.BuildConfig
+import com.anshul.expenseai.data.model.ExpenseCategoryUI
+import com.anshul.expenseai.data.model.StatCard
+import com.anshul.expenseai.data.model.StatusBarInfo
 import com.anshul.expenseai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.expenseai.ui.nav.Screen
+import com.anshul.expenseai.ui.theme.MinimalDarkColors
 import com.anshul.expenseai.util.constants.ExpenseConstant.EMAIL_PREFS
 import com.anshul.expenseai.util.constants.ExpenseConstant.EXPENSE_SHARED_PREFS
 import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_IN_PREF
@@ -65,60 +67,8 @@ import java.util.*
 
 private const val TAG = "ExpenseTrackerMinimalDark"
 
-// Dark Theme Color Palette
-object MinimalDarkColors {
-    // Background colors
-    val Gray950 = Color(0xFF0A0A0A)
-    val Gray900 = Color(0xFF111827)
-    val Gray800 = Color(0xFF1F2937)
-    val Gray700 = Color(0xFF374151)
-    val Gray600 = Color(0xFF4B5563)
-    val Gray500 = Color(0xFF6B7280)
-    val Gray400 = Color(0xFF9CA3AF)
-    val Gray300 = Color(0xFFD1D5DB)
 
-    // Accent colors
-    val Indigo600 = Color(0xFF4F46E5)
-    val Indigo500 = Color(0xFF6366F1)
-    val Indigo400 = Color(0xFF818CF8)
-    val Indigo200 = Color(0xFFC7D2FE)
-    val Purple600 = Color(0xFF9333EA)
-    val Purple500 = Color(0xFFA855F7)
-    val Purple400 = Color(0xFFC084FC)
 
-    // Category colors
-    val CategoryIndigo = Color(0xFF818CF8)
-    val CategoryGreen = Color(0xFF34D399)
-    val CategoryOrange = Color(0xFFF59E0B)
-    val CategoryRed = Color(0xFFEF4444)
-    val CategoryPurple = Color(0xFF8B5CF6)
-    val CategoryBlue = Color(0xFF3B82F6)
-    val CategoryPink = Color(0xFFEC4899)
-    val CategoryYellow = Color(0xFFFBBF24)
-}
-
-// Data Models
-data class ExpenseCategoryUI(
-    val name: String,
-    val percentage: Float,
-    val amount: Double,
-    val color: Color,
-    val icon: ImageVector
-)
-
-data class StatusBarInfo(
-    val time: String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
-    val signalStrength: Int = 4,
-    val wifiEnabled: Boolean = true,
-    val batteryLevel: Int = 85
-)
-
-data class StatCard(
-    val label: String,
-    val title: String,
-    val value: String,
-    val color: Color
-)
 
 // Helper function to map category names to colors and icons
 fun getCategoryColorAndIcon(categoryName: String): Pair<Color, ImageVector> {
@@ -138,7 +88,7 @@ fun getCategoryColorAndIcon(categoryName: String): Pair<Color, ImageVector> {
 // Main Screen with Business Logic Integration
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpenseTrackerMinimalDarkIntegratedScreen(
+fun ExpenseTrackerScreen(
     navController: NavController,
     viewModel: ExpenseTrackerViewModel = hiltViewModel(),
 ) {
@@ -147,16 +97,16 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
     val sp = context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
     val coroutineScope = rememberCoroutineScope()
 
-    // Permission launcher for SMS
+    // Permission launcher for Location
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             viewModel.onPermissionResult(true)
-            Log.d(TAG, "SMS Permission Granted")
+            Log.d(TAG, "Location Permission Granted")
         } else {
             viewModel.onPermissionResult(false)
-            Log.d(TAG, "SMS Permission Denied")
+            Log.d(TAG, "Location Permission Denied")
         }
     }
 
@@ -166,8 +116,8 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
             is ExpenseTrackerSideEffect.ShowToast -> {
                 Toast.makeText(context, sideEffect.message, Toast.LENGTH_SHORT).show()
             }
-            is ExpenseTrackerSideEffect.RequestSmsPermission -> {
-                permissionLauncher.launch(Manifest.permission.READ_SMS)
+            is ExpenseTrackerSideEffect.RequestLocationPermission -> {
+                permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
     }
@@ -311,16 +261,19 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
         sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)
     }
 
+    var showGoogleSignInFlow by remember {
+        mutableStateOf(true)
+    }
+
     // Convert ViewModel data to UI models
     val expenseData = remember(state.nativeChart) {
         state.nativeChart.map { chartData ->
-            val (color, icon) = getCategoryColorAndIcon("shopping")
+            val (color) = getCategoryColorAndIcon(chartData.name)
             ExpenseCategoryUI(
-                name = "Shopping",
-                percentage = 50f,
-                amount = 100.0,
-                color = color,
-                icon = icon
+                name = chartData.name,
+                percentage = chartData.percentage,
+                amount = chartData.amount,
+                color = color
             )
         }
     }
@@ -390,19 +343,21 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Google Sign-In Button (if first time)
-                    if (isFirstSignIn) {
-                        GoogleSignInButtonCompose(
-                            onClick = {
-                                createGoogleSignInWithButton()
-                                sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
-                                viewModel.setIsFirstTimeSignInFromGoogleButton(true)
-                            }
-                        )
-                    } else {
-                        LaunchedEffect(Unit) {
-                            viewModel.firstTimeSignInOccurred {
-                                createGoogleSignIn()
+                    if(showGoogleSignInFlow) {
+                        // Google Sign-In Button (if first time)
+                        if (isFirstSignIn) {
+                            GoogleSignInButtonCompose(
+                                onClick = {
+                                    createGoogleSignInWithButton()
+                                    sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
+                                    viewModel.setIsFirstTimeSignInFromGoogleButton(true)
+                                }
+                            )
+                        } else {
+                            LaunchedEffect(Unit) {
+                                viewModel.firstTimeSignInOccurred {
+                                    createGoogleSignIn()
+                                }
                             }
                         }
                     }
@@ -426,6 +381,7 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
 
                     // Chart Section (only if data exists)
                     if (expenseData.isNotEmpty()) {
+                        showGoogleSignInFlow = false
                         CategoryBreakdownCard(
                             expenseData = expenseData,
                             onViewTransactionsClick = {
@@ -439,7 +395,7 @@ fun ExpenseTrackerMinimalDarkIntegratedScreen(
 
                     // Smart Insights Card (with loading state)
                     if (state.isRecommendationLoading) {
-                        SmartInsightsLoadingCard()
+                        SmartInsightsLoadingCardDetailed()
                     } else if (state.recommendation?.isNotEmpty() == true) {
                         SmartInsightsCard(recommendation = state.recommendation)
                     }
@@ -950,54 +906,6 @@ fun StatsCard(
 }
 
 @Composable
-fun SmartInsightsLoadingCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(24.dp),
-                spotColor = MinimalDarkColors.Indigo600.copy(alpha = 0.3f)
-            ),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        border = BorderStroke(
-            1.dp,
-            MinimalDarkColors.Indigo500.copy(alpha = 0.5f)
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MinimalDarkColors.Indigo600.copy(alpha = 0.25f),
-                            MinimalDarkColors.Purple600.copy(alpha = 0.25f)
-                        )
-                    )
-                )
-                .padding(20.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                AnimatedRecommendationLoaderM3()
-                Text(
-                    text = "Generating insights...",
-                    fontSize = 14.sp,
-                    color = MinimalDarkColors.Gray300
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun DarkBottomIndicator(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
@@ -1036,7 +944,7 @@ fun ExpenseTrackerMinimalDarkTheme(
 @Composable
 fun ExpenseTrackerMinimalDarkIntegratedPreview() {
     val context = LocalContext.current
-    ExpenseTrackerMinimalDarkIntegratedScreen(
+    ExpenseTrackerScreen(
         navController = NavHostController(context)
     )
 }
