@@ -163,6 +163,9 @@ dependencies {
     implementation(libs.google.firebase.analytics)
     implementation (libs.compose.charts)
     implementation(libs.androidx.material.icons.extended)
+    //firebase remote config
+    implementation(libs.firebase.config)
+
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

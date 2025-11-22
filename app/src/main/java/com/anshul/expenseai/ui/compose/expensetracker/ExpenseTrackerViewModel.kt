@@ -43,6 +43,7 @@ import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.type.FirebaseAIException
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -57,7 +58,8 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val readSmsRepo: ReadSmsRepo,
     private val expenseDataFetcher: ExpenseDataFetcher,
     private val preferences: SharedPreferences,
-    private val gmailRepo : GmailRepo
+    private val gmailRepo : GmailRepo,
+    private val remoteConfig: FirebaseRemoteConfig
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -152,7 +154,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             Log.d("ThreadCheck", "analyseExpenseData() running on: ${Thread.currentThread().name}")
 
             val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                .generativeModel("gemini-2.5-pro")
+                .generativeModel(remoteConfig.getString("model_name"))
 
             val batchSize = 10
             val batches = messages.chunked(batchSize)
@@ -280,7 +282,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                    .generativeModel("gemini-2.5-pro") // Use PRO model for reasoning
+                    .generativeModel(remoteConfig.getString("model_name")) // Use PRO model for reasoning
 
                 val expensesJson = gson.toJson(expenses)
                 val locationJson = fetchCurrentLocationSuspend(context)

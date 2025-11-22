@@ -70,6 +70,7 @@ firebase-ai = { module = "com.google.firebase:firebase-ai", version.ref = "fireb
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-bom-v3440 = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBomVersion" }
+firebase-config = { module = "com.google.firebase:firebase-config" }
 firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
 firebase-vertexai = { module = "com.google.firebase:firebase-vertexai" }
 google-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
