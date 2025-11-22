@@ -6,9 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import com.anshul.expenseai.ui.compose.expensetracker.ExpenseTrackerScreen
 import androidx.navigation.compose.composable
-import com.anshul.expenseai.ui.compose.expensetracker.ExpenseDetailsScreen
+import com.anshul.expenseai.ui.compose.expensetracker.ExpenseDetailScreen
+import com.anshul.expenseai.ui.compose.expensetracker.ExpenseTrackerScreen
 import com.anshul.expenseai.ui.compose.expensetracker.ExpenseTrackerViewModel
 
 @Composable
@@ -30,7 +30,7 @@ fun ExpenseNavigation(
                 navController.getBackStackEntry(Screen.ExpenseTracker.route)
             }
             val viewModel: ExpenseTrackerViewModel = hiltViewModel(parentEntry)
-            ExpenseDetailsScreen(navController,viewModel)
+            ExpenseDetailScreen(navController, viewModel)
 
         }
     }

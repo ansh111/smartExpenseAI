@@ -161,6 +161,11 @@ dependencies {
     // When using the BoM, you don't specify versions in Firebase library dependencies
     implementation(libs.firebase.crashlytics.ndk)
     implementation(libs.google.firebase.analytics)
+    implementation (libs.compose.charts)
+    implementation(libs.androidx.material.icons.extended)
+    //firebase remote config
+    implementation(libs.firebase.config)
+
     //test
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

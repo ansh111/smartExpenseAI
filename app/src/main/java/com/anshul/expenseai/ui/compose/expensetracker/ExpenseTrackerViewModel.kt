@@ -37,19 +37,17 @@ import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
+import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.repository.GmailRepo
-import com.anshul.expenseai.util.HelperFunctions.decodeString
-import com.anshul.expenseai.util.HelperFunctions.extractPlainTextFromHtml
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
 import com.google.android.gms.auth.GoogleAuthException
-import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.type.FirebaseAIException
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlin.time.measureTime
 
 
 @HiltViewModel
@@ -60,7 +58,8 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val readSmsRepo: ReadSmsRepo,
     private val expenseDataFetcher: ExpenseDataFetcher,
     private val preferences: SharedPreferences,
-    private val gmailRepo : GmailRepo
+    private val gmailRepo : GmailRepo,
+    private val remoteConfig: FirebaseRemoteConfig
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -82,8 +81,8 @@ class ExpenseTrackerViewModel @Inject constructor(
         if (granted) {
             scanSmsForExpenses()
         } else {
-            reduce { state.copy(errorMessage = "SMS permission denied. Cannot scan expenses.") }
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast("SMS permission denied."))
+            reduce { state.copy(errorMessage = "Location permission denied Please enable it from settings.") }
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Location permission denied."))
         }
     }
 
@@ -104,10 +103,10 @@ class ExpenseTrackerViewModel @Inject constructor(
     fun scanSmsForExpenses() = intent {
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.READ_SMS
+            Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasPermission) {
-            postSideEffect(ExpenseTrackerSideEffect.RequestSmsPermission)
+            postSideEffect(ExpenseTrackerSideEffect.RequestLocationPermission)
             return@intent
         }
 
@@ -155,7 +154,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             Log.d("ThreadCheck", "analyseExpenseData() running on: ${Thread.currentThread().name}")
 
             val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                .generativeModel("gemini-2.5-pro")
+                .generativeModel(remoteConfig.getString("model_name"))
 
             val batchSize = 10
             val batches = messages.chunked(batchSize)
@@ -283,7 +282,7 @@ class ExpenseTrackerViewModel @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                    .generativeModel("gemini-2.5-pro") // Use PRO model for reasoning
+                    .generativeModel(remoteConfig.getString("model_name")) // Use PRO model for reasoning
 
                 val expensesJson = gson.toJson(expenses)
                 val locationJson = fetchCurrentLocationSuspend(context)
@@ -325,14 +324,30 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    private fun aggregateExpensesByCategory(expenses: List<ExpenseItem>): Map<String, Double> {
-        return expenses.groupBy { it.category }
-            .mapValues { entry -> entry.value.sumOf { it.amount } }
+    private fun aggregateExpenses(expenses: List<ExpenseItem>): List<ExpenseCategoryUI> {
+        if (expenses.isEmpty()) return emptyList()
+
+        // 1. Aggregate amounts per category in a single pass
+        val categoryTotals = expenses.groupBy { it.category }
+            .mapValues { (_, items) -> items.sumOf { it.amount } }
+
+        // 2. Compute overall sum once
+        val totalExpense = categoryTotals.values.sum()
+
+        // 3. Build the UI list
+        return categoryTotals.map { (category, amount) ->
+            ExpenseCategoryUI(
+                name = category,
+                percentage = amount.toFloat()*100 / totalExpense.toFloat(), // fraction (0–1)
+                amount = amount,
+                color = androidx.compose.ui.graphics.Color.Red
+            )
+        }
     }
 
-    private fun generateNativeChart(expenseItem: List<ExpenseItem>): Map<String, Double> {
-        if (expenseItem.isEmpty()) return emptyMap()
-        val aggregatedData = aggregateExpensesByCategory(expenseItem)
+    private fun generateNativeChart(expenseItem: List<ExpenseItem>): List<ExpenseCategoryUI> {
+        if (expenseItem.isEmpty()) return emptyList()
+        val aggregatedData = aggregateExpenses(expenseItem)
         return aggregatedData
 
     }
@@ -371,7 +386,19 @@ class ExpenseTrackerViewModel @Inject constructor(
     }
 
     internal fun fetchGmailData(context: Context) {
+
+
         intent {
+
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                postSideEffect(ExpenseTrackerSideEffect.RequestLocationPermission)
+                return@intent
+            }
+
             reduce {
                 state.copy(isLoading = true)
             }
