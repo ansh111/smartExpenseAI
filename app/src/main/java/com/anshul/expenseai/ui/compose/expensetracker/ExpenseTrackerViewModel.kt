@@ -42,6 +42,7 @@ import com.anshul.expenseai.data.repository.GmailRepo
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
+import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.type.FirebaseAIException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import kotlinx.coroutines.async
@@ -59,7 +60,8 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val expenseDataFetcher: ExpenseDataFetcher,
     private val preferences: SharedPreferences,
     private val gmailRepo : GmailRepo,
-    private val remoteConfig: FirebaseRemoteConfig
+    private val remoteConfig: FirebaseRemoteConfig,
+    private val generativeModel: GenerativeModel
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
     override val container: Container<ExpenseTrackerState, ExpenseTrackerSideEffect> =
@@ -79,7 +81,7 @@ class ExpenseTrackerViewModel @Inject constructor(
     fun onPermissionResult(granted: Boolean) = intent {
         reduce { state.copy(permissionGranted = granted) }
         if (granted) {
-            scanSmsForExpenses()
+            fetchGmailData(context)
         } else {
             reduce { state.copy(errorMessage = "Location permission denied Please enable it from settings.") }
             postSideEffect(ExpenseTrackerSideEffect.ShowToast("Location permission denied."))
@@ -133,6 +135,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                     postSideEffect(ExpenseTrackerSideEffect.ShowToast("No relevant SMS found."))
                     return@intent
                 }
+
                 analyseExpenseData(smsMessages)
             }) as List<ExpenseItem>
 
@@ -153,9 +156,6 @@ class ExpenseTrackerViewModel @Inject constructor(
         try {
             Log.d("ThreadCheck", "analyseExpenseData() running on: ${Thread.currentThread().name}")
 
-            val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                .generativeModel(remoteConfig.getString("model_name"))
-
             val batchSize = 10
             val batches = messages.chunked(batchSize)
 
@@ -167,17 +167,28 @@ class ExpenseTrackerViewModel @Inject constructor(
                 async(dispatcher) {
                     try {
                         val prompt = """
-                        Extract expense details from each of these SMS messages.
-                        For each SMS, identify the merchant, amount, date, and categorize the expense 
-                        (e.g., Food, Shopping, Bills, Travel, Other).
-                        If you cannot determine a value, use "N/A".
-                        Return the output as a JSON array of objects. 
-                        Each object should have keys:
-                        "merchant", "amount" (as a number), "date" (YYYY-MM-DD if possible, else original), "category".
+                        You extract structured data from SMS messages. Output JSON only. No explanations.
                         
-                        SMS messages:
-                        ${batch.joinToString("\n\n")}
-                    """.trimIndent()
+                        FIELDS:
+                        - merchant
+                        - amount (number)
+                        - date (YYYY-MM-DD if possible)
+                        - category (Food | Shopping | Bills | Travel | Other | N/A)
+                        
+                        RULES:
+                        - Use "N/A" when uncertain.
+                        - No text before or after JSON.
+                        - One object per SMS.
+                        
+                        FORMAT:
+                        [
+                          {"merchant": "", "amount": 0, "date": "", "category": ""}
+                        ]
+                        
+                        SMS:
+                        ${batch.joinToString("\n---\n")}
+                        """.trimIndent()
+
 
                         val requestContent = content { text(prompt) }
                         val response = generativeModel.generateContent(requestContent)
@@ -281,8 +292,6 @@ class ExpenseTrackerViewModel @Inject constructor(
     private suspend fun analyzeExpensesAndRecommend(expenses: List<ExpenseItem>): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-                    .generativeModel(remoteConfig.getString("model_name")) // Use PRO model for reasoning
 
                 val expensesJson = gson.toJson(expenses)
                 val locationJson = fetchCurrentLocationSuspend(context)

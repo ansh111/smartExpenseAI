@@ -23,9 +23,37 @@ object HelperFunctions {
             if (mod == 0) it else it + "=".repeat(4 - mod)
         }
         val decodedBytes = Base64.decode(normalized, Base64.DEFAULT)
-        return String(decodedBytes, Charsets.UTF_8)
+        val message = String(decodedBytes, Charsets.UTF_8)
+        return cleanSmsForLLM(message)
 
     }
+
+    fun cleanSmsForLLM(raw: String): String {
+        // Step 1: Normalize whitespace
+        var t = raw.replace("\\s+".toRegex(), " ").trim()
+
+        // Step 2: Remove promotional / disclaimer / footer patterns
+        t = t
+            .replace("(?i)warm regards.*".toRegex(), "")
+            .replace("(?i)safe banking tip.*".toRegex(), "")
+            .replace("(?i)exclusive offer.*".toRegex(), "")
+            .replace("(?i)please note.*".toRegex(), "")
+            .replace("(?i)cashback.*".toRegex(), "")
+            .replace("(?i)connect with us.*".toRegex(), "")
+            .replace("(?i)to unsubscribe.*".toRegex(), "")
+            .replace("(?i)click here.*".toRegex(), "")
+            .replace("(?i)this emailer.*".toRegex(), "")
+            .replace("(?i)report at.*".toRegex(), "")
+            .replace("(?i)visit .*".toRegex(), "")
+
+        // Step 3: Keep only substring that contains the "amount + merchant + date" structure
+        // so LLM doesn't see useless tokens
+        val regex = Regex("(Rs\\.? ?[0-9,.]+.*?on [0-9\\-/]{6,})", RegexOption.IGNORE_CASE)
+        val match = regex.find(t)
+
+        return match?.value?.trim() ?: raw.trim()     // fallback if SMS pattern is different
+    }
+
 
 
     /**
