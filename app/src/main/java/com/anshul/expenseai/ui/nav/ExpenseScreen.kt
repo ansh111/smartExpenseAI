@@ -1,7 +1,10 @@
 package com.anshul.expenseai.ui.nav
 
-sealed class Screen(val  route: String) {
-    object ExpenseTracker :  Screen("expense_tracker_screen")
-    object ExpenseDetails: Screen("expense_details_screen")
-
+// In a file like navigation/Screen.kt or similar
+sealed class Screen(val route: String) {
+    object ExpenseTracker : Screen("expense_tracker_screen")
+    object ExpenseDetails : Screen("expense_details_screen/{categoryName}") {
+        // Helper function to create the route with the actual category
+        fun createRoute(categoryName: String) = "expense_details_screen/$categoryName"
+    }
 }

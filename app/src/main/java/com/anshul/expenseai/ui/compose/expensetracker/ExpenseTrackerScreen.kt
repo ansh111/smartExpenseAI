@@ -385,7 +385,10 @@ fun ExpenseTrackerScreen(
                         CategoryBreakdownCard(
                             expenseData = expenseData,
                             onViewTransactionsClick = {
-                                navController.navigate(Screen.ExpenseDetails.route)
+                                navController.navigate(Screen.ExpenseDetails.createRoute(categoryName = "all"))
+                            },
+                            onCategoryClick = { it ->
+                                navController.navigate(Screen.ExpenseDetails.createRoute(categoryName = it))
                             }
                         )
 
@@ -620,7 +623,8 @@ fun DarkHeader(
 @Composable
 fun CategoryBreakdownCard(
     expenseData: List<ExpenseCategoryUI>,
-    onViewTransactionsClick: () -> Unit
+    onViewTransactionsClick: () -> Unit,
+    onCategoryClick:(category : String) -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -690,7 +694,7 @@ fun CategoryBreakdownCard(
                         )
                     },
                     onPieClick = { pie ->
-                      //  Log.d(TAG, "Clicked on: ${pie.label}")
+                        Log.d(TAG, "Clicked on: ${pie.label}")
                     },
                     selectedScale = 1.1f,
                     scaleAnimEnterSpec = spring(
@@ -714,7 +718,9 @@ fun CategoryBreakdownCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 expenseData.forEach { category ->
-                    CategoryListItem(category)
+                    CategoryListItem(category) { categoryName ->
+                        onCategoryClick(categoryName)
+                    }
                 }
             }
 
@@ -729,68 +735,7 @@ fun CategoryBreakdownCard(
     }
 }
 
-@Composable
-fun CategoryListItem(category: ExpenseCategoryUI) {
-    var isHovered by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { isHovered = !isHovered },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isHovered) {
-                MinimalDarkColors.Gray900.copy(alpha = 0.7f)
-            } else {
-                MinimalDarkColors.Gray900.copy(alpha = 0.5f)
-            }
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(category.color)
-                )
-                Text(
-                    text = category.name,
-                    color = MinimalDarkColors.Gray300,
-                    fontSize = 14.sp
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${category.percentage.toInt()}%",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MinimalDarkColors.Gray500,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun DarkGradientButton(

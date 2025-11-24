@@ -30,9 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.anshul.expenseai.ui.compose.expensetracker.ExpenseTrackerMinimalDarkTheme
-import com.anshul.expenseai.ui.compose.expensetracker.ExpenseTrackerViewModel
-import com.anshul.expenseai.ui.compose.expensetracker.getCategoryColorAndIcon
 import com.anshul.expenseai.ui.compose.expensetracker.state.ExpenseItem
 import com.anshul.expenseai.ui.theme.MinimalDarkColors
 import java.text.SimpleDateFormat
@@ -42,12 +39,21 @@ import java.util.*
 @Composable
 fun ExpenseDetailScreen(
     navController: NavController,
-    viewModel: ExpenseTrackerViewModel
+    viewModel: ExpenseTrackerViewModel,
+    categoryName: String?
 ) {
     val state by viewModel.container.stateFlow.collectAsStateWithLifecycle()
 
     val totalAmount = remember(state.expenses) {
         state.expenses.sumOf { it.amount }
+    }
+
+    val filteredExpenses = remember(state.expenses, categoryName) {
+        if(categoryName == "all"){
+            state.expenses
+        } else {
+            state.expenses.filter { it.category.equals(categoryName, ignoreCase = true) }
+        }
     }
 
     ExpenseTrackerMinimalDarkTheme {
@@ -92,7 +98,7 @@ fun ExpenseDetailScreen(
                         contentPadding = PaddingValues(vertical = 16.dp)
                     ) {
                         items(
-                            items = state.expenses,
+                            items = filteredExpenses,
                             key = { it.messageId }
                         ) { expense ->
                             ExpenseCard(expense = expense)

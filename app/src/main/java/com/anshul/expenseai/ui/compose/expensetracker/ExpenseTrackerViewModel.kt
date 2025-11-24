@@ -60,7 +60,6 @@ class ExpenseTrackerViewModel @Inject constructor(
     private val expenseDataFetcher: ExpenseDataFetcher,
     private val preferences: SharedPreferences,
     private val gmailRepo : GmailRepo,
-    private val remoteConfig: FirebaseRemoteConfig,
     private val generativeModel: GenerativeModel
 ) : ContainerHost<ExpenseTrackerState, ExpenseTrackerSideEffect>, ViewModel() {
 
@@ -453,4 +452,5 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
 
     }
+
 }
