@@ -268,7 +268,7 @@ fun ParsedInsights(recommendation: String, isExpanded: Boolean) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            QuickActionButtons()
+          //  QuickActionButtons()
         }
     }
 }
@@ -323,7 +323,7 @@ fun InsightLine(line: String, index: Int) {
     }
 }
 
-@Composable
+/*@Composable
 fun QuickActionButtons() {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -340,7 +340,7 @@ fun QuickActionButtons() {
             modifier = Modifier.weight(1f)
         )
     }
-}
+}*/
 
 @Composable
 fun ActionButton(

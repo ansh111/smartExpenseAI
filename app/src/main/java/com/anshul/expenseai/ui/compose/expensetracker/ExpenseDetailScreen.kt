@@ -181,9 +181,9 @@ fun ExpenseDetailsTopBar(
                     )
                 }
 
-                // Filter icon
+                /*// Filter icon
                 IconButton(
-                    onClick = { /* TODO: Add filter functionality */ },
+                    onClick = { *//* TODO: Add filter functionality *//* },
                     modifier = Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(12.dp))
@@ -194,7 +194,7 @@ fun ExpenseDetailsTopBar(
                         contentDescription = "Filter",
                         tint = MinimalDarkColors.Indigo400
                     )
-                }
+                }*/
             }
 
             Spacer(modifier = Modifier.height(16.dp))

@@ -47,7 +47,7 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) :
             val bearerToken = "Bearer $token"
             val response = if (lastSyncTimestamp == 0L) {
                 val q = """
-                    (\"debited from account\" OR \"withdrawn from account\") OR
+                    (\"debited from account\" OR \"withdrawn from account\" OR \"has been debited\") OR
 (category:updates
 (subject:debit OR subject:transaction)
 (\"has been debited\" OR \"withdrawn from account\"))
@@ -60,10 +60,10 @@ newer_than:30d
                 )
             } else {
                 val q = """
-                   (\"debited from account\" OR \"withdrawn from account\") OR
+                   (\"debited from account\" OR \"withdrawn from account\" OR \"has been debited\") OR
 (category:updates
 (subject:debit OR subject:transaction)
-(\"has been debited\" OR \"withdrawn from account\"))
+(\"has been debited\" OR \"withdrawn from account\")) 
 -SIP -EMI -AutoPay -mutual -insurance
                 after:${lastSyncTimestamp / 1000} before:${System.currentTimeMillis() / 1000}
                 """.trimIndent()

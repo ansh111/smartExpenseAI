@@ -326,7 +326,7 @@ fun ExpenseTrackerScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Mobile Status Bar
-                DarkStatusBar(statusBarInfo)
+              //  DarkStatusBar(statusBarInfo)
 
                 // Header with Total Balance
                 DarkHeader(
@@ -543,7 +543,7 @@ fun DarkHeader(
                 )
             }
 
-            Box(
+            /*Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(16.dp))
@@ -556,7 +556,7 @@ fun DarkHeader(
                     tint = MinimalDarkColors.Indigo400,
                     modifier = Modifier.size(24.dp)
                 )
-            }
+            }*/
         }
 
         Card(
@@ -694,7 +694,7 @@ fun CategoryBreakdownCard(
                         )
                     },
                     onPieClick = { pie ->
-                        Log.d(TAG, "Clicked on: ${pie.label}")
+                        onCategoryClick(pie.label.toString())
                     },
                     selectedScale = 1.1f,
                     scaleAnimEnterSpec = spring(
