@@ -113,7 +113,9 @@ fun OnboardingFlow(onComplete: () -> Unit) {
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    onClick = onComplete,
+                    onClick = {
+                        onComplete.invoke()
+                    },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MinimalDarkColors.Gray400
                     )
@@ -131,6 +133,7 @@ fun OnboardingFlow(onComplete: () -> Unit) {
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
             ) { page ->
                 OnboardingPage(pages[page])
             }

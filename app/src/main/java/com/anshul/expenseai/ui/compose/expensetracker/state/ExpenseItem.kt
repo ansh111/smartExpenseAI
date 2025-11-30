@@ -1,6 +1,7 @@
 package com.anshul.expenseai.ui.compose.expensetracker.state
 
 import android.content.Intent
+import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.model.MessagesItem
 
 data class ExpenseItem( // Define your refined expense data structure
@@ -17,7 +18,7 @@ data class ExpenseTrackerState(
     val errorMessage: String? = null,
     val permissionGranted: Boolean = false,
     val recommendation: String? = null,
-    val nativeChart: Map<String, Double> = emptyMap(),
+    val nativeChart: List<ExpenseCategoryUI> = emptyList(),
     val isGmailConsentNeeded: Boolean = false,
     val gmailConsentIntent: Intent? = null,
     val gmailMessagesId: List<MessagesItem> = emptyList(),
@@ -26,5 +27,5 @@ data class ExpenseTrackerState(
 
 sealed class ExpenseTrackerSideEffect {
     data class ShowToast(val message: String) : ExpenseTrackerSideEffect()
-    object RequestSmsPermission : ExpenseTrackerSideEffect()
+    object RequestLocationPermission : ExpenseTrackerSideEffect()
 }
