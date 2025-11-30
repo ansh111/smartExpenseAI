@@ -1,5 +1,6 @@
 package com.anshul.expenseai.util
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -14,11 +15,15 @@ class ExpenseDataFetcher(
     // 🔹 Fetch nearby restaurants using Google Maps Places API
     suspend fun fetchNearbyRestaurants(lat: Double, lon: Double): JSONObject =
         withContext(Dispatchers.IO) {
-            val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
-                    "?location=$lat,$lon&radius=2000&type=restaurant&key=$googleApiKey"
+            try {
+                val url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
+                        "?location=$lat,$lon&radius=2000&type=restaurant&key=$googleApiKey"
 
-            val response = httpGet(url)
-            JSONObject(response)
+                val response = httpGet(url)
+                JSONObject(response)
+            } catch (e: Exception) {
+                JSONObject("")
+            }
         }
 
     // 🔹 Fetch nearby services/stores using Google Maps Places API
@@ -44,12 +49,38 @@ class ExpenseDataFetcher(
 
     // 🔹 Simple HTTP GET helper
     private fun httpGet(urlString: String): String {
-        val url = URL(urlString)
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
-        connection.connectTimeout = 5000
-        connection.readTimeout = 5000
+        return try {
+            val url = URL(urlString)
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                instanceFollowRedirects = true
+            }
 
-        return connection.inputStream.bufferedReader().use { it.readText() }
+            val responseCode = connection.responseCode
+
+            val stream = if (responseCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream   // <-- THIS WAS MISSING
+            }
+
+            stream.bufferedReader().use { it.readText() }
+
+        } catch (e: java.net.UnknownHostException) {
+            // DNS / no internet / blocked domain
+            Log.e("HTTP", "DNS failure for $urlString", e)
+            ""
+
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.e("HTTP", "Timeout for $urlString", e)
+            ""
+
+        } catch (e: Exception) {
+            Log.e("HTTP", "Generic network error for $urlString", e)
+            ""
+        }
     }
+
 }

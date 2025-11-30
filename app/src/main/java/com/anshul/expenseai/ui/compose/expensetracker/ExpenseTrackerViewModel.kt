@@ -45,10 +45,13 @@ import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.type.FirebaseAIException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.util.nextAlphanumericString
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlin.random.Random
+import kotlin.random.nextInt
 
 
 @HiltViewModel
@@ -87,6 +90,16 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
+    fun onPermissionResult1(granted: Boolean) = intent {
+        reduce { state.copy(permissionGranted = granted) }
+        if (granted) {
+            scanSmsForExpenses()
+        } else {
+            reduce { state.copy(errorMessage = "SMS permission denied Please enable it from settings.") }
+            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Location permission denied."))
+        }
+    }
+
     /**
      * Function to rescrit calling GoogleSignIn more than once in view model lifecycle
      */
@@ -104,10 +117,10 @@ class ExpenseTrackerViewModel @Inject constructor(
     fun scanSmsForExpenses() = intent {
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.READ_SMS
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasPermission) {
-            postSideEffect(ExpenseTrackerSideEffect.RequestLocationPermission)
+            postSideEffect(ExpenseTrackerSideEffect.RequestSMSPermission)
             return@intent
         }
 
@@ -165,19 +178,31 @@ class ExpenseTrackerViewModel @Inject constructor(
             val deferredResults = batches.mapIndexed { index, batch ->
                 async(dispatcher) {
                     try {
+                        val safeBatch = batch.map { sanitizeSms(it) }
                         val prompt = """
-                        You extract structured data from SMS messages. Output JSON only. No explanations.
+                        You extract structured expense data from SMS messages. Output JSON only. No explanations.
                         
                         FIELDS:
                         - merchant
                         - amount (number)
                         - date (YYYY-MM-DD if possible)
-                        - category (Food | Shopping | Bills | Travel | Other | N/A)
+                        - category (Food | Shopping | Bills | Travel | Other)
                         
                         RULES:
-                        - Use "N/A" when uncertain.
+                        - ONLY include records that represent REAL EXPENSES.
+                        - EXCLUDE any of the following:
+                          - Self transfers
+                          - Transfers to own bank accounts
+                          - Wallet top-ups
+                          - Credit card bill payments
+                          - UPI collect requests with no debit
+                        - Detect self-transfer using keywords such as:
+                          "to self", "own account", "self transfer", "saved beneficiary",
+                          your own name, or same sender & receiver bank.
+                        - If an SMS is excluded, DO NOT return any object for it.
+                        - Use "Other" when uncertain.
                         - No text before or after JSON.
-                        - One object per SMS.
+                        - Return an empty array [] if no valid expenses exist.
                         
                         FORMAT:
                         [
@@ -185,8 +210,11 @@ class ExpenseTrackerViewModel @Inject constructor(
                         ]
                         
                         SMS:
-                        ${batch.joinToString("\n---\n")}
+                        <BEGIN_SMS>
+                        ${safeBatch.joinToString("\n---\n")}
+                        <END_SMS>
                         """.trimIndent()
+
 
 
                         val requestContent = content { text(prompt) }
@@ -220,7 +248,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                             amount = item.amount,
                             date = item.date,
                             category = item.category,
-                            messageId = item.messageId
+                            messageId = Random.nextAlphanumericString(10)
+
                         )
                     }
 
@@ -240,6 +269,17 @@ class ExpenseTrackerViewModel @Inject constructor(
 
         return@coroutineScope tempExpenses
     }
+
+    fun sanitizeSms(text: String): String =
+        text
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", " ")
+            .replace("\r", " ")
+            .replace("\t", " ")
+            .replace("<", "")
+            .replace(">", "")
+
 
 
     fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>) =  intent{

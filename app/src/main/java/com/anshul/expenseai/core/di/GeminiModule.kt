@@ -27,7 +27,7 @@ object GeminiModule {
         modelName: String
     ): GenerativeModel {
         return Firebase.ai(backend = GenerativeBackend.vertexAI())
-            .generativeModel(modelName)
+            .generativeModel("gemini-2.5-pro")
     }
 
 }

@@ -81,6 +81,7 @@ fun getCategoryColorAndIcon(categoryName: String): Pair<Color, ImageVector> {
         "health", "healthcare" -> MinimalDarkColors.CategoryGreen to Icons.Default.Favorite
         "education" -> MinimalDarkColors.CategoryBlue to Icons.Default.School
         "other", "others" -> MinimalDarkColors.CategoryGreen to Icons.Default.MoreHoriz
+        "N/A" -> MinimalDarkColors.CategoryBrown to Icons.Default.DoNotDisturbAlt
         else -> MinimalDarkColors.CategoryYellow to Icons.Default.Category
     }
 }
@@ -110,6 +111,18 @@ fun ExpenseTrackerScreen(
         }
     }
 
+    val permissionLauncher1 = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.onPermissionResult1(true)
+            Log.d(TAG, "Location Permission Granted")
+        } else {
+            viewModel.onPermissionResult1(false)
+            Log.d(TAG, "Location Permission Denied")
+        }
+    }
+
     // Handle side effects
     viewModel.collectSideEffect { sideEffect ->
         when (sideEffect) {
@@ -118,6 +131,10 @@ fun ExpenseTrackerScreen(
             }
             is ExpenseTrackerSideEffect.RequestLocationPermission -> {
                 permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+
+            is ExpenseTrackerSideEffect.RequestSMSPermission -> {
+                permissionLauncher1.launch(Manifest.permission.READ_SMS)
             }
         }
     }
@@ -361,6 +378,10 @@ fun ExpenseTrackerScreen(
                             }
                         }
                     }
+
+                   Button(modifier = Modifier.fillMaxWidth(), onClick = {viewModel.scanSmsForExpenses()}){
+                       Text(text = "Scan SMS")
+                   }
 
                     // Loading State
                     if (state.isLoading && expenseData.isEmpty()) {
