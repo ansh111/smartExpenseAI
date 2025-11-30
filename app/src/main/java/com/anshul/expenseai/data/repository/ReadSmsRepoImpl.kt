@@ -43,7 +43,42 @@ class ReadSmsRepoImpl @Inject constructor(private val contentResolver: ContentRe
             }
         }
 
-        return@withContext messages.take(100)
+        return@withContext messages
 
+    }
+
+
+
+    private fun isSelfTransferSms(body: String): Boolean {
+        val text = body.lowercase()
+
+        val selfTransferPatterns = listOf(
+            "self",
+            "own account",
+            "between your accounts",
+            "to your own",
+            "to your account",
+            "credited to your a/c",
+            "linked account",
+            "intra bank",
+            "same bank transfer"
+        )
+
+        return selfTransferPatterns.any { text.contains(it) }
+    }
+
+    private fun isWalletOrP2P(body: String): Boolean {
+        val text = body.lowercase()
+
+        val walletKeywords = listOf(
+            "credited",
+            "received",
+            "refund",
+            "cashback",
+            "reward",
+            "reversal"
+        )
+
+        return walletKeywords.any { text.contains(it) }
     }
 }

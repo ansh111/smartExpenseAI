@@ -42,4 +42,5 @@ object MinimalDarkColors {
     val CategoryBlue = Color(0xFF3B82F6)
     val CategoryPink = Color(0xFFEC4899)
     val CategoryYellow = Color(0xFFFBBF24)
+    val CategoryBrown = Color(0xFF57534E)
 }

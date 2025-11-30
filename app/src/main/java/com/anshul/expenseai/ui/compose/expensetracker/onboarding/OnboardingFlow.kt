@@ -52,10 +52,7 @@ fun OnboardingFlow(onComplete: () -> Unit) {
                 description = "Connect your Gmail account to automatically track expenses from email receipts",
                 detailedInfo = listOf(
                     "Automatically extract transaction details from purchase receipts",
-                    "Categorize expenses based on merchant information",
-                    "Sync payment confirmations and invoices seamlessly",
-                    "Save time with automatic expense logging",
-                    "Your data is encrypted and never shared"
+                    "Categorize expenses based on merchant information"
                 ),
                 icon = Icons.Default.Email,
                 iconColor = MinimalDarkColors.CategoryRed,
@@ -70,8 +67,6 @@ fun OnboardingFlow(onComplete: () -> Unit) {
                 detailedInfo = listOf(
                     "Automatically tag expenses with merchant locations",
                     "Get spending insights based on frequently visited places",
-                    "Track travel expenses with accurate location data",
-                    "Receive nearby offers and cashback opportunities",
                     "Location data is only used when the app is active"
                 ),
                 icon = Icons.Default.LocationOn,

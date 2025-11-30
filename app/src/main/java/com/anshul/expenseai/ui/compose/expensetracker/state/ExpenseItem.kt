@@ -28,4 +28,5 @@ data class ExpenseTrackerState(
 sealed class ExpenseTrackerSideEffect {
     data class ShowToast(val message: String) : ExpenseTrackerSideEffect()
     object RequestLocationPermission : ExpenseTrackerSideEffect()
+    object RequestSMSPermission: ExpenseTrackerSideEffect()
 }
