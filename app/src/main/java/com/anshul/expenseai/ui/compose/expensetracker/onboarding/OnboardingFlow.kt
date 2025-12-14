@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -48,13 +49,14 @@ fun OnboardingFlow(onComplete: () -> Unit) {
     val pages = remember {
         listOf(
             OnboardingPage(
-                title = "Gmail Integration",
-                description = "Connect your Gmail account to automatically track expenses from email receipts",
+                title = "SMS Integration",
+                description = "Scan the transaction based SMS to fetch the debit details",
                 detailedInfo = listOf(
                     "Automatically extract transaction details from purchase receipts",
-                    "Categorize expenses based on merchant information"
+                    "Categorize expenses based on merchant information",
+                    "SMS doesn't read your OTP  and other privater messages"
                 ),
-                icon = Icons.Default.Email,
+                icon = Icons.Default.Sms,
                 iconColor = MinimalDarkColors.CategoryRed,
                 gradientColors = listOf(
                     MinimalDarkColors.CategoryRed.copy(alpha = 0.3f),

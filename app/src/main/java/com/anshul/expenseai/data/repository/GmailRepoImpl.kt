@@ -35,12 +35,12 @@ class GmailRepoImpl @Inject constructor(val repo: ExpenseRepo, val gson: Gson) :
         const val LAST_SYNC_TIME = "last_sync_time"
         const val GMAIL_SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
     }
-    override suspend fun readMails(context: Context, lastSyncTimestamp: Long): List<ExpenseItem> =
+    override suspend fun readMails(appContext: Context, lastSyncTimestamp: Long): List<ExpenseItem> =
         withContext(Dispatchers.IO) {
-            val sp = context.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
+            val sp = appContext.getSharedPreferences(EXPENSE_SHARED_PREFS, Context.MODE_PRIVATE)
 
             val token = GoogleAuthUtil.getToken(
-                context,
+                appContext,
                 sp.getString(EMAIL_PREFS, "").toString(), GMAIL_SCOPE
             )
             Log.d(TAG, "Access Token: $token")

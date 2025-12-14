@@ -19,9 +19,6 @@ import com.anshul.expenseai.ui.compose.expensetracker.state.ExpenseTrackerState
 import com.anshul.expenseai.util.ExpenseDataFetcher
 import com.google.android.gms.location.LocationServices
 import com.google.common.reflect.TypeToken
-import com.google.firebase.Firebase
-import com.google.firebase.ai.ai
-import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.content
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,19 +36,19 @@ import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
 import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.repository.GmailRepo
+import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBottomSheet
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
+import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.type.FirebaseAIException
-import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.util.nextAlphanumericString
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
-import kotlin.random.nextInt
 
 
 @HiltViewModel
@@ -73,15 +70,26 @@ class ExpenseTrackerViewModel @Inject constructor(
     companion object {
         const val LAST_SYNC_TIME = "last_sync_time"
         const val TAG = "ExpenseTrackerViewModel"
-        const val GMAIL_SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
     }
 
     internal suspend fun delete30DaysOldExpenses() {
         repo.delete30DaysOldExpenses()
     }
 
+    fun checkForSMSPermission() = intent {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            postSideEffect(ExpenseTrackerSideEffect.RequestSMSPermission)
+            return@intent
+        }else{
+            scanSmsForExpenses()
+        }
+    }
+
     fun onPermissionResult(granted: Boolean) = intent {
-        reduce { state.copy(permissionGranted = granted) }
         if (granted) {
             fetchGmailData(context)
         } else {
@@ -90,13 +98,16 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    fun onPermissionResult1(granted: Boolean) = intent {
-        reduce { state.copy(permissionGranted = granted) }
+    fun onPermissionResultSMS(granted: Boolean) = intent {
         if (granted) {
             scanSmsForExpenses()
         } else {
-            reduce { state.copy(errorMessage = "SMS permission denied Please enable it from settings.") }
-            postSideEffect(ExpenseTrackerSideEffect.ShowToast("Location permission denied."))
+            if (preferences.getBoolean(FIRST_GMAIL_SIGN_DONE, false)) {
+                postSideEffect(ExpenseTrackerSideEffect.SkipGmailSignInFlow)
+            } else {
+                postSideEffect(ExpenseTrackerSideEffect.ShowGmailBottomSheet)
+
+            }
         }
     }
 
@@ -129,7 +140,13 @@ class ExpenseTrackerViewModel @Inject constructor(
         try {
 
             val firstExpense = repo.getAllExpenses().first()
+            val  lastSyncTime =  preferences.getLong(LAST_SYNC_TIME,0L)
+
             val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
+                if(lastSyncTime != System.currentTimeMillis()){
+                    val smsMessage =  readSmsRepo.readSms(lastSyncTime)
+                    analyseExpenseData(smsMessage)
+                }
                 firstExpense.map {
                     ExpenseItem(
                         merchant = it.description,
@@ -491,6 +508,26 @@ class ExpenseTrackerViewModel @Inject constructor(
 
         }
 
+    }
+
+    fun showGoogleSignInSheet() = intent {
+        reduce {
+            state.copy(activeSheet = GoogleSignInBottomSheet.GoogleSignIn)
+        }
+    }
+
+    fun dismissBottomSheet() = intent {
+        reduce {
+            state.copy(activeSheet = GoogleSignInBottomSheet.None)
+        }
+    }
+
+    fun skipGmailSignInFlow() = intent{
+        reduce {
+            state.copy(
+                activeSheet = GoogleSignInBottomSheet.GoogleSignInUsingCred
+            )
+        }
     }
 
 }
