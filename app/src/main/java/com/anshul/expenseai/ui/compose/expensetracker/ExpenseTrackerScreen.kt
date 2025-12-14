@@ -394,7 +394,10 @@ fun ExpenseTrackerScreen(
                                 .height(300.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = MinimalDarkColors.Indigo400)
+                            CompactInteractiveLoader(
+                                        modifier = Modifier.padding(top = 20.dp),
+                                        message = "Loading transactions..."
+                            )
                         }
                     }
 

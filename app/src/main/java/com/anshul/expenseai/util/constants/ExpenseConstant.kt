@@ -7,5 +7,6 @@ object ExpenseConstant {
     const val FIRST_GMAIL_SIGN_DONE ="first_gmail_sign_done"
     const val LAST_SYNC_TIME = "last_sync_time"
     const val SHOW_ONBOARDING = "show_onboarding"
+    const val RECOMMENDATION_SAVED_RESPONSE = "recommendation_saved_response"
 
 }

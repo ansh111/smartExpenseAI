@@ -92,7 +92,6 @@ newer_than:30d
                                                 )
                                             )
                                         )
-                                        //  extractPlainTextFromHtml(decodeString(payloadParts.body.data))
                                     )
                                 } else {
                                     payloadParts.parts.map {
@@ -100,7 +99,6 @@ newer_than:30d
                                             messageId = payload.id,
                                             message = extractPlainTextFromHtml(decodeString(it.body.data))
                                         )
-                                        //  extractPlainTextFromHtml(decodeString(it.body.data))
                                     }
                                 }
                             } ?: emptyList<DecodeMessages>()
@@ -109,14 +107,14 @@ newer_than:30d
             } ?: emptyList()
             Log.d("Anshul", "Fetched ${allDecodedTexts.size} messages")
 
-            val refinedExpenses = analyseExpenseData1(allDecodedTexts, sp)
+            val refinedExpenses = analyseExpenseData(allDecodedTexts, sp)
             Log.d("AnshulNigam", refinedExpenses.time)
             return@withContext refinedExpenses.result
         }
 
 
     @SuppressLint("SuspiciousIndentation")
-    suspend fun analyseExpenseData1(
+    suspend fun analyseExpenseData(
         messages: List<DecodeMessages>,
         sp: SharedPreferences
     ): ExpenseResult = coroutineScope {
