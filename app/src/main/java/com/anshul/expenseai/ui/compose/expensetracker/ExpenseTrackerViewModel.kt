@@ -40,6 +40,7 @@ import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBo
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
 import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
 import com.anshul.expenseai.util.constants.ExpenseConstant.RECOMMENDATION_SAVED_RESPONSE
+import com.anshul.expenseai.util.tf.ExpenseClassifier
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.GenerativeModel
@@ -170,7 +171,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                     return@intent
                 }
 
-                analyseExpenseData(smsMessages)
+               // analyseExpenseData(smsMessages)
+                analyseUsingTfLite(smsMessages)
             }) as List<ExpenseItem>
 
             buildRefinedExpenseData(refinedExpenses, isSMSApiCallHappened)
@@ -178,6 +180,16 @@ class ExpenseTrackerViewModel @Inject constructor(
         } catch (e: Exception){
 
         }
+    }
+
+    suspend fun analyseUsingTfLite(smsMessages: List<String>){
+        val classifier = ExpenseClassifier(context)
+
+        val (category, confidence) = classifier.classify(
+            smsMessages[0]
+        )
+
+        Log.d("ExpenseAI", "Category=$category confidence=$confidence")
     }
 
     /**

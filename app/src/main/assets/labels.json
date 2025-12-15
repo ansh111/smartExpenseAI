@@ -1,0 +1,7 @@
+{
+  "Food": 0,
+  "Shopping": 1,
+  "Bills": 2,
+  "Travel": 3,
+  "Other": 4
+}

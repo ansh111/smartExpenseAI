@@ -157,6 +157,9 @@ dependencies {
     // Import the BoM for the Firebase platform
     implementation(platform(libs.firebase.bom.v3440))
 
+    //tf-lite
+    implementation (libs.tensorflow.lite)
+
     // Add the dependencies for the Crashlytics NDK and Analytics libraries
     // When using the BoM, you don't specify versions in Firebase library dependencies
     implementation(libs.firebase.crashlytics.ndk)
