@@ -38,6 +38,12 @@ import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.repository.GmailRepo
 import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBottomSheet
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractAmount
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractDate
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractMerchant
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isCollectRequest
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isSelfTransfer
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isWalletTopUp
 import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
 import com.anshul.expenseai.util.constants.ExpenseConstant.RECOMMENDATION_SAVED_RESPONSE
 import com.anshul.expenseai.util.tf.ExpenseClassifier
@@ -50,6 +56,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlin.collections.addAll
 import kotlin.random.Random
 
 
@@ -182,15 +189,55 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    suspend fun analyseUsingTfLite(smsMessages: List<String>){
+    suspend fun analyseUsingTfLite(
+        smsMessages: List<String>
+    ): List<ExpenseItem> = coroutineScope {
+
         val classifier = ExpenseClassifier(context)
+        val resultExpense = mutableListOf<ExpenseItem>()
 
-        val (category, confidence) = classifier.classify(
-            smsMessages[0]
-        )
+        try {
+            smsMessages.forEach { msg ->
 
-        Log.d("ExpenseAI", "Category=$category confidence=$confidence")
+                val normalized = msg.lowercase()
+
+                if (isSelfTransfer(normalized)) return@forEach
+                if (isWalletTopUp(normalized)) return@forEach
+                if (isCollectRequest(normalized)) return@forEach
+
+                val amount = extractAmount(msg) ?: return@forEach
+
+                val merchant = extractMerchant(msg) ?: return@forEach
+
+                val date = extractDate(msg)
+
+                // 🧠 ML classification AFTER validation
+                val (category, confidence) = classifier.classify(msg)
+
+                Log.d("ExpenseAI", "msg=$msg")
+                Log.d("ExpenseAI", "category=$category confidence=$confidence")
+                Log.d("ExpenseAI", "amount=$amount merchant=$merchant date=$date")
+
+                resultExpense.add(
+                    ExpenseItem(
+                        merchant = merchant,
+                        amount = amount,
+                        date = date ?: "NA",
+                        category = category,
+                        messageId = Random.nextAlphanumericString(10)
+                    )
+                )
+            }
+
+            syncSMSWithDB(resultExpense)
+
+        } catch (e: Exception) {
+            Log.e("ExpenseAI", "analyseUsingTfLite failed", e)
+        }
+
+        return@coroutineScope resultExpense
     }
+
 
     /**
      * Not removing this since it is used for sms scanning will first make it generic then remove
@@ -274,25 +321,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             val allExpenses = deferredResults.awaitAll().flatten()
 
             // Safely update DB and preferences on IO dispatcher
-            withContext(Dispatchers.IO) {
-                if (allExpenses.isNotEmpty()) {
-                    val expenseEntities = allExpenses.map { item ->
-                        ExpenseEntity(
-                            description = item.merchant,
-                            amount = item.amount,
-                            date = item.date,
-                            category = item.category,
-                            messageId = Random.nextAlphanumericString(10)
-
-                        )
-                    }
-
-                    repo.insertAllExpenses(expenseEntities)
-                    preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
-
-                    println("💾 Saved ${expenseEntities.size} expenses to DB")
-                }
-            }
+            syncSMSWithDB(allExpenses)
 
             tempExpenses.addAll(allExpenses)
 
@@ -302,6 +331,26 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
 
         return@coroutineScope tempExpenses
+    }
+
+    fun syncSMSWithDB(allExpenses: List<ExpenseItem>) = intent {
+        if (allExpenses.isNotEmpty()) {
+            val expenseEntities = allExpenses.map { item ->
+                ExpenseEntity(
+                    description = item.merchant,
+                    amount = item.amount,
+                    date = item.date,
+                    category = item.category,
+                    messageId = Random.nextAlphanumericString(10)
+
+                )
+            }
+
+            repo.insertAllExpenses(expenseEntities)
+            preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+
+            println("💾 Saved ${expenseEntities.size} expenses to DB")
+        }
     }
 
     fun sanitizeSms(text: String): String =

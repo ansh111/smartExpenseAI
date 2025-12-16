@@ -58,10 +58,13 @@ class ExpenseClassifier(context: Context) {
         vocab: Map<String, Int>,
         maxLen: Int = 40
     ): IntArray {
-        val tokens = text
+
+        val boosted = boostMerchants(text)
+
+        val tokens = boosted
             .lowercase()
-            .replace(Regex("[^a-z0-9 ]"), "")
-            .split(" ")
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .split("\\s+".toRegex())
             .filter { it.isNotBlank() }
 
         val tokenIds = tokens.map { vocab[it] ?: 1 } // 1 = <unk>
@@ -71,6 +74,21 @@ class ExpenseClassifier(context: Context) {
             .toIntArray()
     }
 
+    private fun boostMerchants(text: String): String {
+        val t = text.lowercase()
+        return when {
+            t.contains("swiggy") -> "swiggy swiggy swiggy $t"
+            t.contains("zomato") -> "zomato zomato zomato $t"
+            t.contains("ekart") -> "ekart ekart $t"
+            t.contains("amazon") -> "amazon amazon $t"
+            t.contains("flipkart") -> "flipkart flipkart $t"
+            t.contains("airtel") -> "airtel airtel $t"
+            t.contains("jio") -> "jio jio $t"
+            else -> t
+        }
+    }
+
+
     fun classify(text: String): Pair<String, Float> {
         val input = Array(1) { tokenize(text, vocab) }
         val output = Array(1) { FloatArray(5) }
@@ -78,8 +96,12 @@ class ExpenseClassifier(context: Context) {
         interpreter.run(input, output)
 
         val probs = output[0]
-        val maxIndex = probs.indices.maxByOrNull { probs[it] } ?: -1
+        val maxIndex = probs.indices.maxByOrNull { probs[it] } ?: return "Other" to 0f
         val confidence = probs[maxIndex]
+
+        if (confidence < 0.55f) {
+            return "Other" to confidence
+        }
 
         return labels[maxIndex]!! to confidence
     }
