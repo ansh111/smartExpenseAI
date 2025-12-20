@@ -12,15 +12,44 @@ class ReadSmsRepoImpl @Inject constructor(private val contentResolver: ContentRe
         val thirtyDaysAgo = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
         var selectionArgs: Array<String> = arrayOf("")
         selectionArgs = if(lastSyncTimestamp == 0L){
-            arrayOf("%debit%", "%debited%", "%sent%", thirtyDaysAgo.toString())
+            arrayOf(
+                "%debit%",
+                "%debited%",
+                "%sent%",
+                "%spent%",
+                "%transaction%",
+                "%rs.%",
+                "%inr%",
+                thirtyDaysAgo.toString()
+            )
         }else{
-            arrayOf("%debit%", "%debited%", "%sent%", lastSyncTimestamp.toString())
+            arrayOf(
+                "%debit%",
+                "%debited%",
+                "%sent%",
+                "%spent%",
+                "%transaction%",
+                "%rs.%",
+                "%inr%",
+                lastSyncTimestamp.toString()
+            )
         }
         val cursor = contentResolver.query(
-            Telephony.Sms.Inbox.CONTENT_URI,
+            Telephony.Sms.CONTENT_URI,
             arrayOf(Telephony.Sms.BODY, Telephony.Sms.ADDRESS, Telephony.Sms.DATE),
 
-            "(${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ? OR ${Telephony.Sms.BODY} LIKE ?) AND ${Telephony.Sms.DATE} >= ?",
+            """
+                (
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ? OR
+                    ${Telephony.Sms.BODY} LIKE ?
+                )
+                AND ${Telephony.Sms.DATE} >= ?
+                """.trimIndent(),
             selectionArgs,
             "${Telephony.Sms.DATE} DESC"
         )
@@ -47,38 +76,4 @@ class ReadSmsRepoImpl @Inject constructor(private val contentResolver: ContentRe
 
     }
 
-
-
-    private fun isSelfTransferSms(body: String): Boolean {
-        val text = body.lowercase()
-
-        val selfTransferPatterns = listOf(
-            "self",
-            "own account",
-            "between your accounts",
-            "to your own",
-            "to your account",
-            "credited to your a/c",
-            "linked account",
-            "intra bank",
-            "same bank transfer"
-        )
-
-        return selfTransferPatterns.any { text.contains(it) }
-    }
-
-    private fun isWalletOrP2P(body: String): Boolean {
-        val text = body.lowercase()
-
-        val walletKeywords = listOf(
-            "credited",
-            "received",
-            "refund",
-            "cashback",
-            "reward",
-            "reversal"
-        )
-
-        return walletKeywords.any { text.contains(it) }
-    }
 }

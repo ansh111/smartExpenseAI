@@ -8,5 +8,7 @@ object ExpenseConstant {
     const val LAST_SYNC_TIME = "last_sync_time"
     const val SHOW_ONBOARDING = "show_onboarding"
     const val RECOMMENDATION_SAVED_RESPONSE = "recommendation_saved_response"
+    const val ONBOARDED_USER_INFO = "onboarded_user_info"
+
 
 }

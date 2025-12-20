@@ -1,5 +1,7 @@
 package com.anshul.expenseai.util.tf
 
+import com.anshul.expenseai.ui.compose.expensetracker.UserOnboardingInfo
+
 object SMSClassifierUtility {
 
     fun isSelfTransfer(text: String): Boolean {
@@ -11,7 +13,6 @@ object SMSClassifierUtility {
         )
 
         if (keywords.any { text.contains(it) }) return true
-       // if (userName != null && text.contains(userName.lowercase())) return true
 
         // same bank transfer heuristic
         if (text.contains("from hdfc") && text.contains("to hdfc")) return true
@@ -20,7 +21,7 @@ object SMSClassifierUtility {
     }
 
     fun extractDate(text: String): String? {
-        val regex = Regex("(\\d{2})/(\\d{2})/(\\d{2,4})")
+        val regex = Regex("""(\d{2})[/. -](\d{2})[/. -](\d{2,4})""")
         val match = regex.find(text) ?: return null
 
         val day = match.groupValues[1]
@@ -33,23 +34,73 @@ object SMSClassifierUtility {
     }
 
     fun extractMerchant(text: String): String? {
-        val regex = Regex(
-            "(?i)(?:to|at|via)\\s+([a-z0-9][a-z0-9@._\\-\\s']+?)\\s+(on|ref|txn|using|$)"
+
+        // 1️⃣ Card spend pattern: "spent on <merchant> Credit Card"
+        val cardSpentRegex = Regex(
+            "(?i)spent\\s+on\\s+" +
+                    "([a-z][a-z0-9\\s'.&\\-]{2,}?)" +
+                    "\\s+(?:credit\\s+card|debit\\s+card)"
         )
 
-        return regex.find(text)
-            ?.groupValues
-            ?.get(1)
-            ?.trim()
+        cardSpentRegex.find(text)?.let {
+            return it.groupValues[1].trim()
+        }
+
+        // 2️⃣ Generic debit-style merchant extraction
+        val debitRegex = Regex(
+            "(?i)(?:to|at|via)\\s+" +
+                    "([a-z][a-z0-9\\s'.&\\-]{2,}?)" +
+                    "\\s*(?:\\.\\s*|,\\s*|on\\s|ref\\s|txn\\s|upi[:\\s]|imps|neft|rtgs|$)"
+        )
+
+        debitRegex.find(text)?.let {
+            return it.groupValues[1].trim().removeSuffix(".")
+        }
+
+        // 3️⃣ Credit-style (salary / refunds)
+        val creditedRegex = Regex(
+            "(?i)([A-Z][A-Z\\s]{2,})\\s+credited"
+        )
+
+        creditedRegex.find(text)?.let {
+            return it.groupValues[1].trim()
+        }
+
+        return null
     }
 
+
+
+
     fun extractAmount(text: String): Double? {
-        val regex = Regex("(?i)(rs\\.?|inr)\\s*([0-9]+(?:\\.[0-9]{1,2})?)")
-        return regex.find(text)
-            ?.groupValues
-            ?.get(2)
-            ?.toDoubleOrNull()
+
+        // 1️⃣ INR / Rs prefixed amounts (Rs. 1200, INR 500)
+        val prefixedRegex =
+            Regex("(?i)(rs\\.?|inr)\\s*([0-9]{1,9}(?:\\.[0-9]{1,2})?)")
+
+        prefixedRegex.find(text)?.let {
+            return it.groupValues[2].toDoubleOrNull()
+        }
+
+        // 2️⃣ Bare amount before keywords (203.0 spent / 450 paid / 1200 used)
+        val bareAmountRegex =
+            Regex("(?i)([0-9]{1,9}(?:\\.[0-9]{1,2})?)\\s*(spent|paid|used|debited|charged)")
+
+        bareAmountRegex.find(text)?.let {
+            return it.groupValues[1].toDoubleOrNull()
+        }
+
+        // 3️⃣ Fallback: amount after keywords (spent 203.0)
+        val postKeywordRegex =
+            Regex("(?i)(spent|paid|used|debited|charged)\\s*(rs\\.?|inr)?\\s*([0-9]{1,9}(?:\\.[0-9]{1,2})?)")
+
+        postKeywordRegex.find(text)?.let {
+            return it.groupValues[3].toDoubleOrNull()
+        }
+
+        return null
     }
+
 
 
     fun isWalletTopUp(text: String): Boolean =
@@ -60,6 +111,55 @@ object SMSClassifierUtility {
     fun isCollectRequest(text: String): Boolean =
         listOf("collect request", "request sent", "payment request")
             .any { text.contains(it) }
+
+
+    fun isSelfMerchant(
+        text: String,
+        userInfo: UserOnboardingInfo
+    ): Boolean {
+        val normalizedText = text.lowercase()
+
+        // 1️⃣ Name check (full name + split parts)
+        userInfo.fullName
+            .lowercase()
+            .split(" ")
+            ?.filter { it.length > 2 } // avoid false positives like "an", "ra"
+            ?.forEach { namePart ->
+                if (normalizedText.contains(namePart)) {
+                    return true
+                }
+            }
+
+        // 2️⃣ Phone number check (full + last 4 digits)
+        userInfo.phoneNumber.let { phone ->
+            val cleanPhone = phone.filter { it.isDigit() }
+
+            if (cleanPhone.length >= 10) {
+                val last4 = cleanPhone.takeLast(4)
+
+                if (
+                    normalizedText.contains(cleanPhone) ||
+                    normalizedText.contains(last4)
+                ) {
+                    return true
+                }
+            }
+        }
+
+        // 3️⃣ Email check (full + username part)
+        userInfo.email.lowercase()?.let { email ->
+            val emailUserName = email.substringBefore("@")
+
+            if (
+                normalizedText.contains(email) ||
+                normalizedText.contains(emailUserName)
+            ) {
+                return true
+            }
+        }
+
+        return false
+    }
 
 
 }

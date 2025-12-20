@@ -1,7 +1,22 @@
 {
-  "Food": 0,
-  "Shopping": 1,
-  "Bills": 2,
-  "Travel": 3,
-  "Other": 4
+  "train_labels": {
+    "Food": 0,
+    "Shopping": 1,
+    "Bills": 2,
+    "Travel": 3,
+    "Wallet": 4,
+    "Cash": 5,
+    "Credit": 6,
+    "SelfTransfer": 7
+  },
+  "ui_mapping": {
+    "0": "Food",
+    "1": "Shopping",
+    "2": "Bills",
+    "3": "Travel",
+    "4": "Other",
+    "5": "Other",
+    "6": "Other",
+    "7": "Other"
+  }
 }

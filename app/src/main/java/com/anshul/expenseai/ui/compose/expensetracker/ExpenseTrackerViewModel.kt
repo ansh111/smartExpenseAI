@@ -47,6 +47,7 @@ import com.anshul.expenseai.util.tf.SMSClassifierUtility.isWalletTopUp
 import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
 import com.anshul.expenseai.util.constants.ExpenseConstant.RECOMMENDATION_SAVED_RESPONSE
 import com.anshul.expenseai.util.tf.ExpenseClassifier
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isSelfMerchant
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.GenerativeModel
@@ -56,7 +57,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import kotlin.collections.addAll
 import kotlin.random.Random
 
 
@@ -149,24 +149,37 @@ class ExpenseTrackerViewModel @Inject constructor(
         try {
 
             val firstExpense = repo.getAllExpenses().first()
-            val  lastSyncTime =  preferences.getLong(LAST_SYNC_TIME,0L)
+            val lastSyncTime = preferences.getLong(LAST_SYNC_TIME, 0L)
             var isSMSApiCallHappened = false
 
             val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
-                if(lastSyncTime != System.currentTimeMillis()){
-                    val smsMessage =  readSmsRepo.readSms(lastSyncTime)
-                    analyseExpenseData(smsMessage)
-                    if(smsMessage.isNotEmpty())
+                if (lastSyncTime != System.currentTimeMillis()) {
+                    val smsMessage = readSmsRepo.readSms(lastSyncTime)
+                    analyseUsingTfLite(smsMessage)
+                    if (smsMessage.isNotEmpty())
                         isSMSApiCallHappened = true
-                }
-                firstExpense.map {
-                    ExpenseItem(
-                        merchant = it.description,
-                        amount = it.amount,
-                        date = it.date,
-                        category = it.category.toString(),
-                        messageId = it.messageId
-                    )
+                    val newFirstExpenses = repo.getAllExpenses().first()
+                    newFirstExpenses.map {
+                        ExpenseItem(
+                            merchant = it.description,
+                            amount = it.amount,
+                            date = it.date,
+                            category = it.category.toString(),
+                            messageId = it.messageId
+                        )
+                    }
+
+                } else {
+
+                    firstExpense.map {
+                        ExpenseItem(
+                            merchant = it.description,
+                            amount = it.amount,
+                            date = it.date,
+                            category = it.category.toString(),
+                            messageId = it.messageId
+                        )
+                    }
                 }
             } else {
 
@@ -189,9 +202,9 @@ class ExpenseTrackerViewModel @Inject constructor(
         }
     }
 
-    suspend fun analyseUsingTfLite(
+     fun analyseUsingTfLite(
         smsMessages: List<String>
-    ): List<ExpenseItem> = coroutineScope {
+    ): List<ExpenseItem> {
 
         val classifier = ExpenseClassifier(context)
         val resultExpense = mutableListOf<ExpenseItem>()
@@ -202,6 +215,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val normalized = msg.lowercase()
 
                 if (isSelfTransfer(normalized)) return@forEach
+                repo.getUserOnBoardingInfo()?.let { if (isSelfMerchant(normalized, it)) return@forEach }
                 if (isWalletTopUp(normalized)) return@forEach
                 if (isCollectRequest(normalized)) return@forEach
 
@@ -235,7 +249,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             Log.e("ExpenseAI", "analyseUsingTfLite failed", e)
         }
 
-        return@coroutineScope resultExpense
+        return resultExpense
     }
 
 

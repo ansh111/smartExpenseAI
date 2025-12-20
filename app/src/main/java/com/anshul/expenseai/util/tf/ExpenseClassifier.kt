@@ -11,11 +11,11 @@ class ExpenseClassifier(context: Context) {
 
     private val interpreter: Interpreter
     private val vocab: Map<String, Int>
-    private val labels: Map<Int, String>
+    private val uiMapping: Map<Int, String>
 
     init {
         vocab = loadVocab(context)
-        labels = loadLabels(context)
+        uiMapping = loadLabels(context)
 
         val options = Interpreter.Options().apply {
             setNumThreads(4)
@@ -25,7 +25,7 @@ class ExpenseClassifier(context: Context) {
     }
 
     private fun loadModel(context: Context): MappedByteBuffer {
-        return context.assets.openFd("expense_classifier.tflite").use {
+        return context.assets.openFd("expense_categorizer.tflite").use {
             FileInputStream(it.fileDescriptor).channel.map(
                 FileChannel.MapMode.READ_ONLY,
                 it.startOffset,
@@ -45,11 +45,13 @@ class ExpenseClassifier(context: Context) {
     fun loadLabels(context: Context): Map<Int, String> {
         val json = context.assets.open("labels.json")
             .bufferedReader()
-            .readText()
+            .use { it.readText() }
 
-        val obj = JSONObject(json)
-        return obj.keys().asSequence().associate { key ->
-            obj.getInt(key) to key
+        val root = JSONObject(json)
+        val uiMapping = root.getJSONObject("ui_mapping")
+
+        return uiMapping.keys().asSequence().associate { key ->
+            key.toInt() to uiMapping.getString(key)
         }
     }
 
@@ -91,19 +93,27 @@ class ExpenseClassifier(context: Context) {
 
     fun classify(text: String): Pair<String, Float> {
         val input = Array(1) { tokenize(text, vocab) }
-        val output = Array(1) { FloatArray(5) }
+
+        // 2️⃣ Model has 8 output classes
+        val output = Array(1) { FloatArray(8) }
 
         interpreter.run(input, output)
 
         val probs = output[0]
-        val maxIndex = probs.indices.maxByOrNull { probs[it] } ?: return "Other" to 0f
-        val confidence = probs[maxIndex]
 
-        if (confidence < 0.55f) {
-            return "Other" to confidence
-        }
+        // 3️⃣ Argmax
+        val maxIdx = probs.indices.maxBy { probs[it] }
+        val confidence = probs[maxIdx]
 
-        return labels[maxIndex]!! to confidence
+        // 4️⃣ Map to UI category (safe)
+        val mappedCategory = uiMapping[maxIdx] ?: "Other"
+
+        // 5️⃣ Confidence gating
+        val finalCategory =
+            if (confidence < 0.55f) "Other" else mappedCategory
+
+        return finalCategory to confidence
     }
+
 
 }

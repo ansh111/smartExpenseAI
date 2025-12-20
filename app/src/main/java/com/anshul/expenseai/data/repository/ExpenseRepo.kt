@@ -3,6 +3,7 @@ package com.anshul.expenseai.data.repository
 import com.anshul.expenseai.data.entities.ExpenseEntity
 import com.anshul.expenseai.data.model.GmailMessageResponse
 import com.anshul.expenseai.data.model.thread.GmailThreadResponse
+import com.anshul.expenseai.ui.compose.expensetracker.UserOnboardingInfo
 import kotlinx.coroutines.flow.Flow
 
 interface ExpenseRepo {
@@ -12,4 +13,7 @@ interface ExpenseRepo {
     suspend fun  readEmails(authHeader: String, query: String): GmailMessageResponse
     suspend fun  readThreads(authHeader: String, threadId: String): GmailThreadResponse
     suspend fun  delete30DaysOldExpenses()
+    fun shouldShowOnboarding(): Boolean
+    fun saveUserOnBoardingInfo(userOnboardingInfo: UserOnboardingInfo)
+    fun getUserOnBoardingInfo(): UserOnboardingInfo?
 }
