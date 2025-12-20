@@ -1,11 +1,13 @@
 package com.anshul.expenseai.core.di
 
+import android.content.SharedPreferences
 import com.anshul.expenseai.core.network.ExpenseService
 import com.anshul.expenseai.data.dao.ExpenseDao
 import com.anshul.expenseai.data.repository.ExpenseLocalDataSource
 import com.anshul.expenseai.data.repository.ExpenseRemoteDataSource
 import com.anshul.expenseai.data.repository.ExpenseRepo
 import com.anshul.expenseai.data.repository.ExpenseRepoImpl
+import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,8 +32,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideExpenseDataSource(expenseDao: ExpenseDao): ExpenseLocalDataSource {
-        return ExpenseLocalDataSource(expenseDao)
+    fun provideExpenseDataSource(expenseDao: ExpenseDao, prefs: SharedPreferences, gson: Gson): ExpenseLocalDataSource {
+        return ExpenseLocalDataSource(expenseDao,prefs, gson )
     }
 
     @Provides

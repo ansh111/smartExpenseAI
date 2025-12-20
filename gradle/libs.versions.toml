@@ -42,6 +42,7 @@ orbitViewmodel = "10.0.0"
 playServicesLocation = "21.3.0"
 retrofit = "3.0.0"
 roomRuntime = "2.7.2"
+tensorflowLite = "2.17.0"
 workRuntimeKtx = "2.10.3"
 playServicesAuthBase = "18.3.0"
 
@@ -102,6 +103,7 @@ orbit-viewmodel = { module = "org.orbit-mvi:orbit-viewmodel", version.ref = "orb
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-auth-base = { group = "com.google.android.gms", name = "play-services-auth-base", version.ref = "playServicesAuthBase" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -10,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -45,12 +44,14 @@ import com.anshul.expenseai.BuildConfig
 import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.model.StatCard
 import com.anshul.expenseai.data.model.StatusBarInfo
+import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBottomSheet
+import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBottomSheetHost
 import com.anshul.expenseai.ui.compose.expensetracker.state.ExpenseTrackerSideEffect
 import com.anshul.expenseai.ui.nav.Screen
 import com.anshul.expenseai.ui.theme.MinimalDarkColors
 import com.anshul.expenseai.util.constants.ExpenseConstant.EMAIL_PREFS
 import com.anshul.expenseai.util.constants.ExpenseConstant.EXPENSE_SHARED_PREFS
-import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_IN_PREF
+import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -68,8 +69,6 @@ import java.util.*
 private const val TAG = "ExpenseTrackerMinimalDark"
 
 
-
-
 // Helper function to map category names to colors and icons
 fun getCategoryColorAndIcon(categoryName: String): Pair<Color, ImageVector> {
     return when (categoryName.lowercase()) {
@@ -81,6 +80,7 @@ fun getCategoryColorAndIcon(categoryName: String): Pair<Color, ImageVector> {
         "health", "healthcare" -> MinimalDarkColors.CategoryGreen to Icons.Default.Favorite
         "education" -> MinimalDarkColors.CategoryBlue to Icons.Default.School
         "other", "others" -> MinimalDarkColors.CategoryGreen to Icons.Default.MoreHoriz
+        "N/A" -> MinimalDarkColors.CategoryBrown to Icons.Default.DoNotDisturbAlt
         else -> MinimalDarkColors.CategoryYellow to Icons.Default.Category
     }
 }
@@ -110,14 +110,39 @@ fun ExpenseTrackerScreen(
         }
     }
 
+    val permissionLauncherSMS = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.onPermissionResultSMS(true)
+            Log.d(TAG, "SMS Permission Granted")
+        } else {
+            viewModel.onPermissionResultSMS(false)
+            Log.d(TAG, "SMS Permission Denied")
+        }
+    }
+
     // Handle side effects
     viewModel.collectSideEffect { sideEffect ->
         when (sideEffect) {
             is ExpenseTrackerSideEffect.ShowToast -> {
                 Toast.makeText(context, sideEffect.message, Toast.LENGTH_SHORT).show()
             }
+
             is ExpenseTrackerSideEffect.RequestLocationPermission -> {
                 permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+
+            is ExpenseTrackerSideEffect.RequestSMSPermission -> {
+                permissionLauncherSMS.launch(Manifest.permission.READ_SMS)
+            }
+
+            is ExpenseTrackerSideEffect.ShowGmailBottomSheet -> {
+                viewModel.showGoogleSignInSheet()
+            }
+
+            is ExpenseTrackerSideEffect.SkipGmailSignInFlow ->{
+                viewModel.skipGmailSignInFlow()
             }
         }
     }
@@ -143,6 +168,11 @@ fun ExpenseTrackerScreen(
         viewModel.delete30DaysOldExpenses()
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.checkForSMSPermission()
+    }
+
+
     // Google Sign-In Functions
     fun handleSignInWithGoogleOption(
         context: Context,
@@ -165,6 +195,7 @@ fun ExpenseTrackerScreen(
                     }
                 }
             }
+
             else -> {
                 Log.e(TAG, "Unexpected credential type")
             }
@@ -177,10 +208,12 @@ fun ExpenseTrackerScreen(
             is PublicKeyCredential -> {
                 val responseJson = credential.authenticationResponseJson
             }
+
             is PasswordCredential -> {
                 val username = credential.id
                 val password = credential.password
             }
+
             is CustomCredential -> {
                 if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     try {
@@ -196,6 +229,7 @@ fun ExpenseTrackerScreen(
                     }
                 }
             }
+
             else -> {
                 Log.e(TAG, "Unexpected credential type")
             }
@@ -257,14 +291,6 @@ fun ExpenseTrackerScreen(
         }
     }
 
-    val isFirstSignIn = remember {
-        sp.getBoolean(FIRST_GMAIL_SIGN_IN_PREF, true)
-    }
-
-    var showGoogleSignInFlow by remember {
-        mutableStateOf(true)
-    }
-
     // Convert ViewModel data to UI models
     val expenseData = remember(state.nativeChart) {
         state.nativeChart.map { chartData ->
@@ -294,7 +320,12 @@ fun ExpenseTrackerScreen(
             StatCard(
                 label = "Highest",
                 title = highestCategory?.name ?: "N/A",
-                value = if (highestCategory != null) "₹${String.format("%,.0f", highestCategory.amount)}" else "₹0",
+                value = if (highestCategory != null) "₹${
+                    String.format(
+                        "%,.0f",
+                        highestCategory.amount
+                    )
+                }" else "₹0",
                 color = MinimalDarkColors.Indigo400
             ),
             StatCard(
@@ -306,7 +337,18 @@ fun ExpenseTrackerScreen(
         )
     }
 
-    val statusBarInfo = remember { StatusBarInfo() }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
+
+
+    LaunchedEffect(state.showGmailBottomSheet) {
+        if (state.showGmailBottomSheet) {
+            sheetState.show()
+        } else {
+            sheetState.hide()
+        }
+    }
 
     // Main UI
     ExpenseTrackerMinimalDarkTheme {
@@ -326,7 +368,7 @@ fun ExpenseTrackerScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Mobile Status Bar
-              //  DarkStatusBar(statusBarInfo)
+                //  DarkStatusBar(statusBarInfo)
 
                 // Header with Total Balance
                 DarkHeader(
@@ -343,24 +385,6 @@ fun ExpenseTrackerScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if(showGoogleSignInFlow) {
-                        // Google Sign-In Button (if first time)
-                        if (isFirstSignIn) {
-                            GoogleSignInButtonCompose(
-                                onClick = {
-                                    createGoogleSignInWithButton()
-                                    sp.edit { putBoolean(FIRST_GMAIL_SIGN_IN_PREF, false) }
-                                    viewModel.setIsFirstTimeSignInFromGoogleButton(true)
-                                }
-                            )
-                        } else {
-                            LaunchedEffect(Unit) {
-                                viewModel.firstTimeSignInOccurred {
-                                    createGoogleSignIn()
-                                }
-                            }
-                        }
-                    }
 
                     // Loading State
                     if (state.isLoading && expenseData.isEmpty()) {
@@ -370,7 +394,10 @@ fun ExpenseTrackerScreen(
                                 .height(300.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = MinimalDarkColors.Indigo400)
+                            CompactInteractiveLoader(
+                                        modifier = Modifier.padding(top = 20.dp),
+                                        message = "Loading transactions..."
+                            )
                         }
                     }
 
@@ -381,14 +408,21 @@ fun ExpenseTrackerScreen(
 
                     // Chart Section (only if data exists)
                     if (expenseData.isNotEmpty()) {
-                        showGoogleSignInFlow = false
                         CategoryBreakdownCard(
                             expenseData = expenseData,
                             onViewTransactionsClick = {
-                                navController.navigate(Screen.ExpenseDetails.createRoute(categoryName = "all"))
+                                navController.navigate(
+                                    Screen.ExpenseDetails.createRoute(
+                                        categoryName = "all"
+                                    )
+                                )
                             },
                             onCategoryClick = { it ->
-                                navController.navigate(Screen.ExpenseDetails.createRoute(categoryName = it))
+                                navController.navigate(
+                                    Screen.ExpenseDetails.createRoute(
+                                        categoryName = it
+                                    )
+                                )
                             }
                         )
 
@@ -414,6 +448,37 @@ fun ExpenseTrackerScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 12.dp)
             )
+
+
+            GoogleSignInBottomSheetHost(
+                activeSheet = state.activeSheet,
+                onDismiss = {
+                    viewModel.dismissBottomSheet()
+                }
+            ) { sheet ->
+                when (sheet) {
+                    GoogleSignInBottomSheet.GoogleSignIn -> {
+                        GoogleSignInBottomSheet(
+                            onDismiss = {
+                                viewModel.dismissBottomSheet()
+                            },
+                            onSignInClick = {
+                                createGoogleSignInWithButton()
+                                sp.edit { putBoolean(FIRST_GMAIL_SIGN_DONE, true) }
+                                viewModel.setIsFirstTimeSignInFromGoogleButton(true)
+                            }
+                        )
+                    }
+
+                    GoogleSignInBottomSheet.None -> Unit
+                    GoogleSignInBottomSheet.GoogleSignInUsingCred -> {
+                        viewModel.dismissBottomSheet()
+                        viewModel.firstTimeSignInOccurred {
+                            createGoogleSignIn()
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -542,21 +607,6 @@ fun DarkHeader(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-
-            /*Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MinimalDarkColors.Indigo600.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AccountBalanceWallet,
-                    contentDescription = "Wallet",
-                    tint = MinimalDarkColors.Indigo400,
-                    modifier = Modifier.size(24.dp)
-                )
-            }*/
         }
 
         Card(
@@ -624,7 +674,7 @@ fun DarkHeader(
 fun CategoryBreakdownCard(
     expenseData: List<ExpenseCategoryUI>,
     onViewTransactionsClick: () -> Unit,
-    onCategoryClick:(category : String) -> Unit
+    onCategoryClick: (category: String) -> Unit
 ) {
     Card(
         modifier = Modifier

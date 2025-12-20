@@ -19,9 +19,6 @@ import com.anshul.expenseai.ui.compose.expensetracker.state.ExpenseTrackerState
 import com.anshul.expenseai.util.ExpenseDataFetcher
 import com.google.android.gms.location.LocationServices
 import com.google.common.reflect.TypeToken
-import com.google.firebase.Firebase
-import com.google.firebase.ai.ai
-import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.content
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,16 +36,28 @@ import kotlin.coroutines.suspendCoroutine
 import androidx.core.content.edit
 import com.anshul.expenseai.data.model.ExpenseCategoryUI
 import com.anshul.expenseai.data.repository.GmailRepo
+import com.anshul.expenseai.ui.compose.expensetracker.bottomsheet.GoogleSignInBottomSheet
 import com.anshul.expenseai.util.HelperFunctions.useExponentialBackoffRetry
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractAmount
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractDate
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.extractMerchant
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isCollectRequest
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isSelfTransfer
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isWalletTopUp
+import com.anshul.expenseai.util.constants.ExpenseConstant.FIRST_GMAIL_SIGN_DONE
+import com.anshul.expenseai.util.constants.ExpenseConstant.RECOMMENDATION_SAVED_RESPONSE
+import com.anshul.expenseai.util.tf.ExpenseClassifier
+import com.anshul.expenseai.util.tf.SMSClassifierUtility.isSelfMerchant
 import com.google.android.gms.auth.GoogleAuthException
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.type.FirebaseAIException
-import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.util.nextAlphanumericString
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlin.random.Random
 
 
 @HiltViewModel
@@ -70,20 +79,44 @@ class ExpenseTrackerViewModel @Inject constructor(
     companion object {
         const val LAST_SYNC_TIME = "last_sync_time"
         const val TAG = "ExpenseTrackerViewModel"
-        const val GMAIL_SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly"
     }
 
     internal suspend fun delete30DaysOldExpenses() {
         repo.delete30DaysOldExpenses()
     }
 
+    fun checkForSMSPermission() = intent {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            postSideEffect(ExpenseTrackerSideEffect.RequestSMSPermission)
+            return@intent
+        }else{
+            scanSmsForExpenses()
+        }
+    }
+
     fun onPermissionResult(granted: Boolean) = intent {
-        reduce { state.copy(permissionGranted = granted) }
         if (granted) {
             fetchGmailData(context)
         } else {
             reduce { state.copy(errorMessage = "Location permission denied Please enable it from settings.") }
             postSideEffect(ExpenseTrackerSideEffect.ShowToast("Location permission denied."))
+        }
+    }
+
+    fun onPermissionResultSMS(granted: Boolean) = intent {
+        if (granted) {
+            scanSmsForExpenses()
+        } else {
+            if (preferences.getBoolean(FIRST_GMAIL_SIGN_DONE, false)) {
+                postSideEffect(ExpenseTrackerSideEffect.SkipGmailSignInFlow)
+            } else {
+                postSideEffect(ExpenseTrackerSideEffect.ShowGmailBottomSheet)
+
+            }
         }
     }
 
@@ -104,10 +137,10 @@ class ExpenseTrackerViewModel @Inject constructor(
     fun scanSmsForExpenses() = intent {
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            Manifest.permission.READ_SMS
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasPermission) {
-            postSideEffect(ExpenseTrackerSideEffect.RequestLocationPermission)
+            postSideEffect(ExpenseTrackerSideEffect.RequestSMSPermission)
             return@intent
         }
 
@@ -116,34 +149,109 @@ class ExpenseTrackerViewModel @Inject constructor(
         try {
 
             val firstExpense = repo.getAllExpenses().first()
+            val lastSyncTime = preferences.getLong(LAST_SYNC_TIME, 0L)
+            var isSMSApiCallHappened = false
+
             val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
-                firstExpense.map {
-                    ExpenseItem(
-                        merchant = it.description,
-                        amount = it.amount,
-                        date = it.date,
-                        category = it.category.toString(),
-                        messageId = it.messageId
-                    )
+                if (lastSyncTime != System.currentTimeMillis()) {
+                    val smsMessage = readSmsRepo.readSms(lastSyncTime)
+                    analyseUsingTfLite(smsMessage)
+                    if (smsMessage.isNotEmpty())
+                        isSMSApiCallHappened = true
+                    val newFirstExpenses = repo.getAllExpenses().first()
+                    newFirstExpenses.map {
+                        ExpenseItem(
+                            merchant = it.description,
+                            amount = it.amount,
+                            date = it.date,
+                            category = it.category.toString(),
+                            messageId = it.messageId
+                        )
+                    }
+
+                } else {
+
+                    firstExpense.map {
+                        ExpenseItem(
+                            merchant = it.description,
+                            amount = it.amount,
+                            date = it.date,
+                            category = it.category.toString(),
+                            messageId = it.messageId
+                        )
+                    }
                 }
             } else {
 
                 val smsMessages = readSmsRepo.readSms(0L)
+                isSMSApiCallHappened = true
                 if (smsMessages.isEmpty()) {
                     reduce { state.copy(isLoading = false) }
                     postSideEffect(ExpenseTrackerSideEffect.ShowToast("No relevant SMS found."))
                     return@intent
                 }
 
-                analyseExpenseData(smsMessages)
+               // analyseExpenseData(smsMessages)
+                analyseUsingTfLite(smsMessages)
             }) as List<ExpenseItem>
 
-            buildRefinedExpenseData(refinedExpenses)
+            buildRefinedExpenseData(refinedExpenses, isSMSApiCallHappened)
 
         } catch (e: Exception){
 
         }
     }
+
+     fun analyseUsingTfLite(
+        smsMessages: List<String>
+    ): List<ExpenseItem> {
+
+        val classifier = ExpenseClassifier(context)
+        val resultExpense = mutableListOf<ExpenseItem>()
+
+        try {
+            smsMessages.forEach { msg ->
+
+                val normalized = msg.lowercase()
+
+                if (isSelfTransfer(normalized)) return@forEach
+                repo.getUserOnBoardingInfo()?.let { if (isSelfMerchant(normalized, it)) return@forEach }
+                if (isWalletTopUp(normalized)) return@forEach
+                if (isCollectRequest(normalized)) return@forEach
+
+                val amount = extractAmount(msg) ?: return@forEach
+
+                val merchant = extractMerchant(msg) ?: return@forEach
+
+                val date = extractDate(msg)
+
+                // 🧠 ML classification AFTER validation
+                val (category, confidence) = classifier.classify(msg)
+
+                Log.d("ExpenseAI", "msg=$msg")
+                Log.d("ExpenseAI", "category=$category confidence=$confidence")
+                Log.d("ExpenseAI", "amount=$amount merchant=$merchant date=$date")
+
+                resultExpense.add(
+                    ExpenseItem(
+                        merchant = merchant,
+                        amount = amount,
+                        date = date ?: "NA",
+                        category = category,
+                        messageId = Random.nextAlphanumericString(10)
+                    )
+                )
+            }
+
+            syncSMSWithDB(resultExpense)
+
+        } catch (e: Exception) {
+            Log.e("ExpenseAI", "analyseUsingTfLite failed", e)
+        }
+
+        return resultExpense
+    }
+
 
     /**
      * Not removing this since it is used for sms scanning will first make it generic then remove
@@ -165,19 +273,31 @@ class ExpenseTrackerViewModel @Inject constructor(
             val deferredResults = batches.mapIndexed { index, batch ->
                 async(dispatcher) {
                     try {
+                        val safeBatch = batch.map { sanitizeSms(it) }
                         val prompt = """
-                        You extract structured data from SMS messages. Output JSON only. No explanations.
+                        You extract structured expense data from SMS messages. Output JSON only. No explanations.
                         
                         FIELDS:
                         - merchant
                         - amount (number)
                         - date (YYYY-MM-DD if possible)
-                        - category (Food | Shopping | Bills | Travel | Other | N/A)
+                        - category (Food | Shopping | Bills | Travel | Other)
                         
                         RULES:
-                        - Use "N/A" when uncertain.
+                        - ONLY include records that represent REAL EXPENSES.
+                        - EXCLUDE any of the following:
+                          - Self transfers
+                          - Transfers to own bank accounts
+                          - Wallet top-ups
+                          - Credit card bill payments
+                          - UPI collect requests with no debit
+                        - Detect self-transfer using keywords such as:
+                          "to self", "own account", "self transfer", "saved beneficiary",
+                          your own name, or same sender & receiver bank.
+                        - If an SMS is excluded, DO NOT return any object for it.
+                        - Use "Other" when uncertain.
                         - No text before or after JSON.
-                        - One object per SMS.
+                        - Return an empty array [] if no valid expenses exist.
                         
                         FORMAT:
                         [
@@ -185,8 +305,11 @@ class ExpenseTrackerViewModel @Inject constructor(
                         ]
                         
                         SMS:
-                        ${batch.joinToString("\n---\n")}
+                        <BEGIN_SMS>
+                        ${safeBatch.joinToString("\n---\n")}
+                        <END_SMS>
                         """.trimIndent()
+
 
 
                         val requestContent = content { text(prompt) }
@@ -212,24 +335,7 @@ class ExpenseTrackerViewModel @Inject constructor(
             val allExpenses = deferredResults.awaitAll().flatten()
 
             // Safely update DB and preferences on IO dispatcher
-            withContext(Dispatchers.IO) {
-                if (allExpenses.isNotEmpty()) {
-                    val expenseEntities = allExpenses.map { item ->
-                        ExpenseEntity(
-                            description = item.merchant,
-                            amount = item.amount,
-                            date = item.date,
-                            category = item.category,
-                            messageId = item.messageId
-                        )
-                    }
-
-                    repo.insertAllExpenses(expenseEntities)
-                    preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
-
-                    println("💾 Saved ${expenseEntities.size} expenses to DB")
-                }
-            }
+            syncSMSWithDB(allExpenses)
 
             tempExpenses.addAll(allExpenses)
 
@@ -241,8 +347,39 @@ class ExpenseTrackerViewModel @Inject constructor(
         return@coroutineScope tempExpenses
     }
 
+    fun syncSMSWithDB(allExpenses: List<ExpenseItem>) = intent {
+        if (allExpenses.isNotEmpty()) {
+            val expenseEntities = allExpenses.map { item ->
+                ExpenseEntity(
+                    description = item.merchant,
+                    amount = item.amount,
+                    date = item.date,
+                    category = item.category,
+                    messageId = Random.nextAlphanumericString(10)
 
-    fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>) =  intent{
+                )
+            }
+
+            repo.insertAllExpenses(expenseEntities)
+            preferences.edit { putLong(LAST_SYNC_TIME, System.currentTimeMillis()) }
+
+            println("💾 Saved ${expenseEntities.size} expenses to DB")
+        }
+    }
+
+    fun sanitizeSms(text: String): String =
+        text
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", " ")
+            .replace("\r", " ")
+            .replace("\t", " ")
+            .replace("<", "")
+            .replace(">", "")
+
+
+
+    fun buildRefinedExpenseData(refinedExpenses: List<ExpenseItem>, isApiCallHappened: Boolean) =  intent{
 
         val nativeChart = generateNativeChart(refinedExpenses)
 
@@ -260,14 +397,18 @@ class ExpenseTrackerViewModel @Inject constructor(
             reduce {
                 state.copy(isRecommendationLoading = true)
             }
-            val recommendations = useExponentialBackoffRetry (
-                shouldRetry = { e ->
-                    e is FirebaseAIException && e.message?.contains("Resource exhausted") == true
+            var recommendations: String? = null
+            if (isApiCallHappened) {
+                recommendations = useExponentialBackoffRetry(
+                    shouldRetry = { e ->
+                        e is FirebaseAIException && e.message?.contains("Resource exhausted") == true
+                    }
+                ) {
+                    analyzeExpensesAndRecommend(refinedExpenses)
                 }
-            ) {
-                analyzeExpensesAndRecommend(refinedExpenses)
+            } else {
+                recommendations = preferences.getString(RECOMMENDATION_SAVED_RESPONSE, "")
             }
-           // val recommendations = analyzeExpensesAndRecommend(refinedExpenses)
             reduce {
                 state.copy(
                     isRecommendationLoading = false,
@@ -323,6 +464,7 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val requestContent = content { text(prompt) }
 
                 val response = generativeModel.generateContent(requestContent)
+                preferences.edit { putString(RECOMMENDATION_SAVED_RESPONSE, response.text) }
 
                 return@withContext response.text
             } catch (e: Exception) {
@@ -407,6 +549,8 @@ class ExpenseTrackerViewModel @Inject constructor(
                 return@intent
             }
 
+            var isApiCallHappened = false
+
             reduce {
                 state.copy(isLoading = true)
             }
@@ -415,7 +559,9 @@ class ExpenseTrackerViewModel @Inject constructor(
                 val lastSyncTime = preferences.getLong(LAST_SYNC_TIME,0L)
                 // use case is when current time is not equal to  saved time then get the delta transactions
                 if(lastSyncTime != System.currentTimeMillis() && firstExpense.isNotEmpty()){
-                    gmailRepo.readMails(context, lastSyncTime)
+                    val result = gmailRepo.readMails(context, lastSyncTime)
+                    if(result.isNotEmpty())
+                        isApiCallHappened = true
                 }
 
                 val refinedExpenses: List<ExpenseItem> = (if (firstExpense.isNotEmpty()) {
@@ -430,9 +576,10 @@ class ExpenseTrackerViewModel @Inject constructor(
                     }
                 } else {
                     gmailRepo.readMails(context, 0L)
+                    isApiCallHappened = true
                 }) as List<ExpenseItem>
                // val result = gmailRepo.readMails(context, 0L)
-                buildRefinedExpenseData(refinedExpenses)
+                buildRefinedExpenseData(refinedExpenses, isApiCallHappened)
             }catch (e: UserRecoverableAuthException) {
                 Log.w(TAG, "Need user consent to access Gmail", e)
                 // Launch consent screen on main thread
@@ -451,6 +598,26 @@ class ExpenseTrackerViewModel @Inject constructor(
 
         }
 
+    }
+
+    fun showGoogleSignInSheet() = intent {
+        reduce {
+            state.copy(activeSheet = GoogleSignInBottomSheet.GoogleSignIn)
+        }
+    }
+
+    fun dismissBottomSheet() = intent {
+        reduce {
+            state.copy(activeSheet = GoogleSignInBottomSheet.None)
+        }
+    }
+
+    fun skipGmailSignInFlow() = intent{
+        reduce {
+            state.copy(
+                activeSheet = GoogleSignInBottomSheet.GoogleSignInUsingCred
+            )
+        }
     }
 
 }

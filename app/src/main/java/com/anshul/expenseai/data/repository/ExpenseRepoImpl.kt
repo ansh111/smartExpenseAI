@@ -3,6 +3,7 @@ package com.anshul.expenseai.data.repository
 import com.anshul.expenseai.data.entities.ExpenseEntity
 import com.anshul.expenseai.data.model.GmailMessageResponse
 import com.anshul.expenseai.data.model.thread.GmailThreadResponse
+import com.anshul.expenseai.ui.compose.expensetracker.UserOnboardingInfo
 import kotlinx.coroutines.flow.Flow
 
 class ExpenseRepoImpl(private val localDataSource: ExpenseLocalDataSource,
@@ -27,9 +28,22 @@ class ExpenseRepoImpl(private val localDataSource: ExpenseLocalDataSource,
         return localDataSource.deleteOldExpenses(thirtyDaysAgo)
     }
 
+    override fun shouldShowOnboarding(): Boolean {
+       return localDataSource.shouldShowOnboarding()
+    }
+
+    override fun saveUserOnBoardingInfo(userOnboardingInfo: UserOnboardingInfo) {
+        localDataSource.saveUser(userOnboardingInfo)
+    }
+
+    override fun getUserOnBoardingInfo(): UserOnboardingInfo? {
+        return localDataSource.getUser()
+    }
+
     override suspend fun getAllExpenses(): Flow<List<ExpenseEntity>> {
         return localDataSource.getAllExpenses()
     }
+
 
 
 

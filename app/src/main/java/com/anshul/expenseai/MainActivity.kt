@@ -5,15 +5,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
-import com.anshul.expenseai.ui.compose.expensetracker.onboarding.ExpenseTrackerWithOnboardingApp
 import com.anshul.expenseai.ui.nav.ExpenseNavigation
 import com.anshul.expenseai.ui.theme.SmartMediaAITheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -31,20 +32,18 @@ class MainActivity : ComponentActivity() {
        //createGoogleSignInWithButton()
         enableEdgeToEdge()
         setContent {
-            /*SmartMediaAITheme {
-                val navController = rememberNavController()
-                Scaffold(
-                    containerColor = MaterialTheme.colorScheme.background
-                ){ innerPadding ->
+            val navController = rememberNavController()
+            SmartMediaAITheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     ExpenseNavigation(
                         navController = navController,
                         modifier = Modifier
                     )
-                   // ExpenseTrackerScreen(modifier = Modifier.padding(innerPadding))
-                   // VideoSummarisationScreen(modifier = Modifier.padding(innerPadding))
                 }
-            }*/
-            ExpenseTrackerWithOnboardingApp()
+            }
         }
     }
 

@@ -99,7 +99,7 @@ fun ExpenseDetailScreen(
                     ) {
                         items(
                             items = filteredExpenses,
-                            key = { it.messageId }
+                            key = { it.messageId}
                         ) { expense ->
                             ExpenseCard(expense = expense)
                         }
